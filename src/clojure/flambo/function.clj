@@ -53,6 +53,7 @@
               (if (serfn? f#) (binding [sfn/*serialize* kryo/serialize]
                                 (serialize-fn f#)) f#))))))
 
+;
 (gen-function Function function)
 (gen-function Function2 function2)
 (gen-function Function3 function3)
@@ -61,6 +62,8 @@
 (gen-function FlatMapFunction2 flat-map-function2)
 (gen-function PairFlatMapFunction pair-flat-map-function)
 (gen-function PairFunction pair-function)
+(gen-function DoubleFlatMapFunction double-flat-map-function) ; A function that takes T, returns zero or more records of type Double from each input record.
+(gen-function DoubleFunction double-function) ; A function that takes T, returns Doubles, and can be used to construct DoubleRDDs.
 
 ;; Replaces the PairFunction-call and PairFlatMapFunction-call defined by the gen-function macro.
 (defn PairFunction-call [this x]
