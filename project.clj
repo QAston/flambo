@@ -1,6 +1,6 @@
-(defproject yieldbot/flambo "0.4.0-SNAPSHOT"
+(defproject com.tangramcare/flambo "0.4.0-SNAPSHOT"
   :description "A Clojure DSL for Apache Spark"
-  :url "https://github.com/yieldbot/flambo"
+  :url "http://git.itx.pl/o2/flambofork/"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.6.0"]
@@ -11,6 +11,8 @@
                   :exclusions [com.twitter/chill-java]]
                  [com.twitter/chill_2.10 "0.3.6"
                   :exclusions [org.scala-lang/scala-library]]]
+  :deploy-repositories [["snapshots" "http://exotica.itx.pl:8080/nexus-2.8.0-05/content/repositories/snapshots/"]
+                        ["releases" "http://exotica.itx.pl:8080/nexus-2.8.0-05/repositories/releases/"]]
   :profiles {:dev
              {:dependencies [[midje "1.6.3"]
                              [criterium "0.4.3"]]
