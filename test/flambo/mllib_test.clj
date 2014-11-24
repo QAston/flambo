@@ -39,6 +39,3 @@
           cols (.numCols m)]
           [rows cols] => [8 2])
     ))
-
-(facts
-  "about ")
