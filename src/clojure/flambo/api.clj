@@ -10,7 +10,8 @@
 ;; happily accepted!
 ;;
 (ns flambo.api
-  (:refer-clojure :exclude [fn map reduce first count take distinct filter group-by values])
+  (:refer-clojure :exclude [fn map reduce  count take distinct filter group-by values]
+                  :rename {first core-first})
   (:require [serializable.fn :as sfn]
             [clojure.tools.logging :as log]
             [flambo.function :refer [flat-map-function
@@ -57,7 +58,49 @@
   [& body]
   `(sfn/fn ~@body))
 
-(defmacro defsparkfn
+(defmacro defsparkfn [name & fdecl]
+  (do
+    (if (instance? clojure.lang.Symbol name)
+      nil
+      (throw (IllegalArgumentException. "First argument to defn must be a symbol")))
+    (let [m (if (string? (core-first fdecl))
+              {:doc (core-first fdecl)}
+              {})
+          fdecl (if (string? (core-first fdecl))
+                  (next fdecl)
+                  fdecl)
+          m (if (map? (core-first fdecl))
+              (conj m (core-first fdecl))
+              m)
+          fdecl (if (map? (core-first fdecl))
+                  (next fdecl)
+                  fdecl)
+          fdecl (if (vector? (core-first fdecl))
+                  (list fdecl)
+                  fdecl)
+          m (if (map? (last fdecl))
+              (conj m (last fdecl))
+              m)
+          fdecl (if (map? (last fdecl))
+                  (butlast fdecl)
+                  fdecl)
+          m (let [inline (:inline m)
+                  ifn (core-first inline)
+                  iname (second inline)]
+              ;; same as: (if (and (= 'fn ifn) (not (symbol? iname))) ...)
+              (if (if (clojure.lang.Util/equiv 'fn ifn)
+                    (if (instance? clojure.lang.Symbol iname) false true))
+                ;; inserts the same fn name to the inline fn if it does not have one
+                (assoc m :inline (cons ifn (cons (clojure.lang.Symbol/intern (.concat (.getName ^clojure.lang.Symbol name) "__inliner"))
+                                                 (next inline))))
+                m))
+          m (conj (if (meta name) (meta name) {}) m)]
+      (list 'def (with-meta name m)
+            ;;todo - restore propagation of fn name
+            ;;must figure out how to convey primitive hints to self calls first
+            (cons `fn fdecl)))))
+
+#_(defmacro defsparkfn
   [name & body]
   `(def ~name
      (fn ~@body)))
