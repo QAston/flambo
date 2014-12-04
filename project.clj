@@ -5,12 +5,15 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/tools.logging "0.2.6"]
-                 [yieldbot/serializable-fn "0.0.6"
+                 [com.tangramcare/serializable-fn "0.0.6-SNAPSHOT"
                   :exclusions [com.twitter/chill-java]]
                  [com.twitter/carbonite "1.4.0"
                   :exclusions [com.twitter/chill-java]]
                  [com.twitter/chill_2.10 "0.3.6"
                   :exclusions [org.scala-lang/scala-library]]]
+  :repositories [["snapshots" {:url      "http://exotica.itx.pl:8080/nexus-2.8.0-05/content/groups/public"
+                               :update   :always
+                               :checksum :fail}]]
   :deploy-repositories [["snapshots" "http://exotica.itx.pl:8080/nexus-2.8.0-05/content/repositories/snapshots/"]
                         ["releases" "http://exotica.itx.pl:8080/nexus-2.8.0-05/repositories/releases/"]]
   :profiles {:dev
