@@ -25,22 +25,3 @@
   (let [^ByteBuffer buf (ByteBuffer/wrap b)
         ^SerializerInstance ser (.. (SparkEnv/get) serializer newInstance)]
     (.deserialize ser buf OBJECT-CLASS-TAG)))
-
-(defmacro defregistrator
-  "A macro for creating a custom kryo registrator for application that need to
-  register custom kryo serializers.
-
-  This macro must be called from a namespace that is AOT compiled. This is not typically
-  an issue since application jars are packaged as uberjars.
-
-  Note that we are extending `BaseFlamboRegistrator` and not spark's `KryoRegistrator`."
-  [name & register-impl]
-  (let [prefix (gensym)
-        classname (str *ns* ".registrator." name)]
-    `(do
-       (gen-class :name ~classname
-                  :extends flambo.kryo.BaseFlamboRegistrator
-                  :prefix ~prefix)
-       (defn ~(symbol (str prefix "register"))
-         ~@register-impl)
-       (def ~name ~classname))))
