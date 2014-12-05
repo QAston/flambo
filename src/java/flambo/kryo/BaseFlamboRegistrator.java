@@ -1,13 +1,19 @@
 package flambo.kryo;
 
+import clojure.lang.IFn;
 import com.esotericsoftware.kryo.Kryo;
 import org.apache.spark.serializer.KryoRegistrator;
 import carbonite.JavaBridge;
 import scala.Tuple2;
 import com.twitter.chill.Tuple2Serializer;
+import clojure.java.api.Clojure;
 
 public class BaseFlamboRegistrator implements KryoRegistrator {
 
+  static {
+    IFn require = Clojure.var("clojure.core", "require");
+    require.invoke(Clojure.read("flambo.kryo.sfn-serializer"));
+  }
   protected void register(Kryo kryo) {
   }
 
@@ -16,6 +22,8 @@ public class BaseFlamboRegistrator implements KryoRegistrator {
     try {
       JavaBridge.enhanceRegistry(kryo);
       kryo.register(Tuple2.class, new Tuple2Serializer());
+      IFn register = Clojure.var("flambo.kryo.sfn-serializer", "register");
+      register.invoke(kryo);
 
       // we have to reflect this scala class since it's private wheeee
       // and grouping returns these, will be fixed in spark 1.0.1
