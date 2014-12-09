@@ -16,17 +16,17 @@
                                :checksum :fail}]]
   :deploy-repositories [["snapshots" "http://exotica.itx.pl:8080/nexus-2.8.0-05/content/repositories/snapshots/"]
                         ["releases" "http://exotica.itx.pl:8080/nexus-2.8.0-05/repositories/releases/"]]
+
+  :aot [flambo.function
+        flambo.kryo.sfn-serializer
+        flambo.example.tfidf
+        ]
   :profiles {:dev
              {:dependencies [[midje "1.6.3"]
                              [criterium "0.4.3"]]
               :plugins [[lein-midje "3.1.3"]
                         [lein-marginalia "0.8.0"]
-                        [codox "0.8.9"]]
-              ;; so gen-class stuff works in the repl
-              :aot [flambo.function
-                    flambo.kryo.sfn-serializer
-                    flambo.example.tfidf
-                    ]}
+                        [codox "0.8.9"]]}
              :provided
              {:dependencies
               [[org.apache.spark/spark-core_2.10 "1.1.0"]
