@@ -2,12 +2,11 @@
   (:require
     [serializable.fn :as sfn]
     [flambo.kryo :as fkryo]
-    ))
-
-(gen-class
-  :name flambo.kryo.SfnSerializer
-  :extends com.esotericsoftware.kryo.Serializer
-  )
+    )
+  (:gen-class
+    :name flambo.kryo.SfnSerializer
+    :extends com.esotericsoftware.kryo.Serializer
+  ))
 
 (defn -write [this kryo output object]
   (binding [sfn/*serialize* fkryo/serialize]
