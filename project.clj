@@ -3,7 +3,7 @@
   :url "http://git.itx.pl/o2/flambofork/"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.6.0"]
+  :dependencies [[org.clojure/clojure "1.7.0-alpha2"]
                  [org.clojure/tools.logging "0.2.6"]
                  [com.tangramcare/serializable-fn "0.0.6-SNAPSHOT"
                   :exclusions [com.twitter/chill-java]]
