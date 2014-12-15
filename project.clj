@@ -29,12 +29,12 @@
                         [codox "0.8.9"]]}
              :provided
              {:dependencies
-              [[org.apache.spark/spark-core_2.10 "1.1.0"]
-               [org.apache.spark/spark-streaming_2.10 "1.1.0"]
-               [org.apache.spark/spark-streaming-kafka_2.10 "1.1.0"]
-               [org.apache.spark/spark-streaming-flume_2.10 "1.1.0"]
-               [org.apache.spark/spark-sql_2.10 "1.1.0"]
-               [org.apache.spark/spark-mllib_2.10 "1.1.0"]]}
+              [[org.apache.spark/spark-core_2.10 "1.1.1"]
+               [org.apache.spark/spark-streaming_2.10 "1.1.1"]
+               [org.apache.spark/spark-streaming-kafka_2.10 "1.1.1"]
+               [org.apache.spark/spark-streaming-flume_2.10 "1.1.1"]
+               [org.apache.spark/spark-sql_2.10 "1.1.1"]
+               [org.apache.spark/spark-mllib_2.10 "1.1.1"]]}
              :uberjar
              {:aot :all}}
   :source-paths ["src/clojure"]
