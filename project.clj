@@ -9,7 +9,7 @@
                   :exclusions [com.twitter/chill-java]]
                  [com.twitter/carbonite "1.4.0"
                   :exclusions [com.twitter/chill-java]]
-                 [com.twitter/chill_2.10 "0.3.6"
+                 [com.twitter/chill_2.10 "0.5.0"
                   :exclusions [org.scala-lang/scala-library]]]
   :repositories [["snapshots" {:url      "http://exotica.itx.pl:8080/nexus-2.8.0-05/content/groups/public"
                                :update   :always
