@@ -3,7 +3,7 @@
   :url "http://git.itx.pl/o2/flambofork/"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.7.0-alpha2"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/tools.logging "0.2.6"]
                  [com.tangramcare/serializable-fn "0.0.6-SNAPSHOT"
                   :exclusions [com.twitter/chill-java]]
@@ -37,6 +37,7 @@
                [org.apache.spark/spark-mllib_2.10 "1.2.0"]]}
              :uberjar
              {:aot :all}}
+  :checksum :warn ;https://issues.apache.org/jira/browse/SPARK-5308
   :source-paths ["src/clojure"]
   :java-source-paths ["src/java"]
   :codox {:defaults {:doc/format :markdown}
@@ -46,4 +47,5 @@
           :src-linenum-anchor-prefix "L"}
   :javac-options ["-source" "1.6" "-target" "1.6"]
   :jvm-opts ^:replace ["-server" "-Xmx1g"]
-  :global-vars {*warn-on-reflection* false})
+  :global-vars {*warn-on-reflection* false}
+  :min-lein-version "2.5.0")
