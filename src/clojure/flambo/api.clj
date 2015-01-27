@@ -385,7 +385,7 @@
   "Returns a `fraction` sample of `rdd`, with or without replacement,
   using a given random number generator `seed`."
   [rdd with-replacement? fraction seed]
-  (.takeSample rdd with-replacement? fraction seed))
+  (.sample rdd with-replacement? fraction seed))
 
 (defn coalesce
   "Decrease the number of partitions in `rdd` to `n`.

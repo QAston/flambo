@@ -4,60 +4,60 @@
             [flambo.conf :as conf]))
 
 (facts
- "about spark-context"
- (let [conf (-> (conf/spark-conf)
-                (conf/master "local[*]")
-                (conf/app-name "api-test"))]
-   (f/with-context c conf
-     (fact
-      "gives us a JavaSparkContext"
-      (class c) => org.apache.spark.api.java.JavaSparkContext)
+  "about spark-context"
+  (let [conf (-> (conf/spark-conf)
+                 (conf/master "local[*]")
+                 (conf/app-name "api-test"))]
+    (f/with-context c conf
+      (fact
+        "gives us a JavaSparkContext"
+        (class c) => org.apache.spark.api.java.JavaSparkContext)
 
-     (fact
-      "creates a JavaRDD"
-      (class (f/parallelize c [1 2 3 4 5])) => org.apache.spark.api.java.JavaRDD)
+      (fact
+        "creates a JavaRDD"
+        (class (f/parallelize c [1 2 3 4 5])) => org.apache.spark.api.java.JavaRDD)
 
-     (fact
-      "round-trips a clojure vector"
-      (-> (f/parallelize c [1 2 3 4 5]) f/collect vec) => (just [1 2 3 4 5]))
+      (fact
+        "round-trips a clojure vector"
+        (-> (f/parallelize c [1 2 3 4 5]) f/collect vec) => (just [1 2 3 4 5]))
 
-     (fact
-      "union concats two RDDs"
-      (let [rdd1 (f/parallelize c [1 2 3 4])
-            rdd2 (f/parallelize c [11 12 13])
-            rdd3 (f/parallelize c [21 22 23])]
-        (-> (f/union c rdd1 rdd2 rdd3)
-            f/collect
-            vec) => (just [1 2 3 4 11 12 13 21 22 23] :in-any-order))))))
-
-(facts
- "about serializable functions"
-
- (let [myfn (f/fn [x] (* 2 x))]
-   (fact
-    "inline op returns a serializable fn"
-    (type myfn) => :serializable.fn/serializable-fn)
-
-   (fact
-    "we can serialize it to a byte-array"
-    (class (serializable.fn/serialize myfn)) => (Class/forName "[B"))
-
-   (fact
-    "it round-trips back to a serializable fn"
-    (type (-> myfn serializable.fn/serialize serializable.fn/deserialize)) => :serializable.fn/serializable-fn)))
+      (fact
+        "union concats two RDDs"
+        (let [rdd1 (f/parallelize c [1 2 3 4])
+              rdd2 (f/parallelize c [11 12 13])
+              rdd3 (f/parallelize c [21 22 23])]
+          (-> (f/union c rdd1 rdd2 rdd3)
+              f/collect
+              vec) => (just [1 2 3 4 11 12 13 21 22 23] :in-any-order))))))
 
 (facts
- "about untupling"
+  "about serializable functions"
 
- (fact
-  "untuple returns a 2 vector"
-  (let [tuple2 (scala.Tuple2. 1 "hi")]
-    (f/untuple tuple2) => [1 "hi"]))
+  (let [myfn (f/fn [x] (* 2 x))]
+    (fact
+      "inline op returns a serializable fn"
+      (type myfn) => :serializable.fn/serializable-fn)
 
- (fact
-  "double untuple returns a vector with a key and a 2 vector value"
-  (let [double-tuple2 (scala.Tuple2. 1 (scala.Tuple2. 2 "hi"))]
-    (f/double-untuple double-tuple2) => [1 [2 "hi"]])))
+    (fact
+      "we can serialize it to a byte-array"
+      (class (serializable.fn/serialize myfn)) => (Class/forName "[B"))
+
+    (fact
+      "it round-trips back to a serializable fn"
+      (type (-> myfn serializable.fn/serialize serializable.fn/deserialize)) => :serializable.fn/serializable-fn)))
+
+(facts
+  "about untupling"
+
+  (fact
+    "untuple returns a 2 vector"
+    (let [tuple2 (scala.Tuple2. 1 "hi")]
+      (f/untuple tuple2) => [1 "hi"]))
+
+  (fact
+    "double untuple returns a vector with a key and a 2 vector value"
+    (let [double-tuple2 (scala.Tuple2. 1 (scala.Tuple2. 2 "hi"))]
+      (f/double-untuple double-tuple2) => [1 [2 "hi"]])))
 
 (facts
   "about transformations"
@@ -230,8 +230,8 @@
         (let [rdd1 (f/parallelize c [1 2])
               rdd2 (f/parallelize c [5 6 7])]
           (-> (f/cartesian rdd1 rdd2)
-            f/collect
-            vec) => (just [[1 5] [1 6] [1 7] [2 5] [2 6] [2 7]] :in-any-order)))
+              f/collect
+              vec) => (just [[1 5] [1 6] [1 7] [2 5] [2 6] [2 7]] :in-any-order)))
 
       (future-fact "repartition returns a new RDD with exactly n partitions")
 
@@ -260,26 +260,26 @@
             (f/count-by-key)) => {"key1" 2 "key2" 2 "key3" 1})
 
       (fact
-       "count-by-value returns a hashmap of (V, int) pairs with the count of each value"
-       (-> (f/parallelize c [["key1" 11]
-                             ["key1" 11]
-                             ["key2" 12]
-                             ["key2" 12]
-                             ["key3" 13]])
-           (f/count-by-value)) => {["key1" 11] 2, ["key2" 12] 2, ["key3" 13] 1})
+        "count-by-value returns a hashmap of (V, int) pairs with the count of each value"
+        (-> (f/parallelize c [["key1" 11]
+                              ["key1" 11]
+                              ["key2" 12]
+                              ["key2" 12]
+                              ["key3" 13]])
+            (f/count-by-value)) => {["key1" 11] 2, ["key2" 12] 2, ["key3" 13] 1})
 
-       (fact
-       "values returns the values (V) of a hashmap of (K, V) pairs from a JavaRDD"
-       (-> (f/parallelize c [["key1" 11]
-                             ["key1" 11]
-                             ["key2" 12]
-                             ["key2" 12]
-                             ["key3" 13]])
-           (f/values)
-           (f/collect)
-           vec) => [11, 11, 12, 12, 13])
+      (fact
+        "values returns the values (V) of a hashmap of (K, V) pairs from a JavaRDD"
+        (-> (f/parallelize c [["key1" 11]
+                              ["key1" 11]
+                              ["key2" 12]
+                              ["key2" 12]
+                              ["key3" 13]])
+            (f/values)
+            (f/collect)
+            vec) => [11, 11, 12, 12, 13])
 
-       (fact
+      (fact
         "values returns the values (V) of a hashmap of (K, V) pairs from a JavaPairRDD"
         (-> (f/parallelize c [["key1" 11]
                               ["key1" 11]
@@ -324,18 +324,18 @@
             vec) => [[1] [2] [3] [4] [5]])
 
       (fact
-       "distinct returns distinct elements of an RDD"
-       (-> (f/parallelize c [1 2 1 3 4 5 4])
-           f/distinct
-           f/collect
-           vec) => (contains #{1 2 3 4 5}))
+        "distinct returns distinct elements of an RDD"
+        (-> (f/parallelize c [1 2 1 3 4 5 4])
+            f/distinct
+            f/collect
+            vec) => (contains #{1 2 3 4 5}))
 
       (fact
-       "distinct returns distinct elements of an RDD with the given number of partitions"
-       (-> (f/parallelize c [1 2 1 3 4 5 4])
-           (f/distinct 2)
-           f/collect
-           vec) => (contains #{1 2 3 4 5}))
+        "distinct returns distinct elements of an RDD with the given number of partitions"
+        (-> (f/parallelize c [1 2 1 3 4 5 4])
+            (f/distinct 2)
+            f/collect
+            vec) => (contains #{1 2 3 4 5}))
 
       (fact
         "take returns an array with the first n elements of an RDD"
@@ -357,12 +357,12 @@
               f/collect) => [1 2 3 4 5]))
 
       (fact
-       "histogram uses bucketCount number of evenly-spaced buckets"
-       (-> (f/parallelize c [1.0 2.2 2.6 3.3 3.5 3.7 4.4 4.8 5.5 6.0])
-           (f/histogram 5)) => [[1.0 2.0 3.0 4.0 5.0 6.0] [1 2 3 2 2]])
+        "histogram uses bucketCount number of evenly-spaced buckets"
+        (-> (f/parallelize c [1.0 2.2 2.6 3.3 3.5 3.7 4.4 4.8 5.5 6.0])
+            (f/histogram 5)) => [[1.0 2.0 3.0 4.0 5.0 6.0] [1 2 3 2 2]])
 
       (fact
-       "histogram uses the provided buckets"
-       (-> (f/parallelize c [1.0 2.2 2.6 3.3 3.5 3.7 4.4 4.8 5.5 6.0])
-           (f/histogram [1.0 4.0 6.0])) => [6 4])
+        "histogram uses the provided buckets"
+        (-> (f/parallelize c [1.0 2.2 2.6 3.3 3.5 3.7 4.4 4.8 5.5 6.0])
+            (f/histogram [1.0 4.0 6.0])) => [6 4])
       )))
