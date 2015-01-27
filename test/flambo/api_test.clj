@@ -366,3 +366,47 @@
         (-> (f/parallelize c [1.0 2.2 2.6 3.3 3.5 3.7 4.4 4.8 5.5 6.0])
             (f/histogram [1.0 4.0 6.0])) => [6 4])
       )))
+
+(facts
+  "about async rdd methods"
+
+  (let [conf (-> (conf/spark-conf)
+                 (conf/master "local[*]")
+                 (conf/app-name "api-test"))]
+    (f/with-context c conf
+
+      (fact "async-collect works like collect"
+            @(-> (f/parallelize c [1 2 3 4 5])
+                (f/collect-async)) => [1 2 3 4 5])
+      (fact "async-count works like count"
+            @(-> (f/parallelize c [1 2 3 4 5])
+                 (f/count-async)) => 5)))
+
+(facts
+  "about take sort variants"
+
+  (let [conf (-> (conf/spark-conf)
+                 (conf/master "local[*]")
+                 (conf/app-name "api-test"))]
+    (f/with-context c conf
+
+      (fact "returns largest nums"
+            (-> (f/parallelize c [1 2 3 4 5])
+                 (f/take-largest 2)) => [5 4])
+
+      (fact "returns largest vecs"
+            (-> (f/parallelize c [[1 2] [3 4 5]])
+                (f/take-largest 1)) => [[3 4 5]])
+
+      (fact "returns smallest nums"
+            (-> (f/parallelize c [1 2 3 4 5])
+                (f/take-smallest 2)) => [1 2])
+
+      (fact "returns smallest nums by compare"
+            (-> (f/parallelize c [1 2 3 4 5])
+                (f/take-smallest 2 clojure.core/compare)) => [1 2])
+
+      (fact "returns nums sorted by pred"
+            (-> (f/parallelize c [1 2 3 4 5])
+                (f/take-sorted-by-pred 2 (f/fn [x y]
+                                               (> x y)))) => [5 4]))))

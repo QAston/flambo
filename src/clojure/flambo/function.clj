@@ -1,4 +1,5 @@
 (ns flambo.function
+  (:refer-clojure :exclude [comparator])
   (:require [serializable.fn :as sfn]
             [flambo.utils :as u]
             [flambo.kryo :as kryo]
@@ -35,35 +36,40 @@
   (symbol (format fmt sym-name)))
 
 (defmacro gen-function
-  [clazz wrapper-name]
-  (let [new-class-sym (mk-sym "flambo.function.%s" clazz)
-        prefix-sym (mk-sym "%s-" clazz)]
-    `(do
-       (def ~(mk-sym "%s-init" clazz) -init)
-       (def ~(mk-sym "%s-call" clazz) -call)
-       (gen-class
-        :name ~new-class-sym
-        :implements [~(mk-sym "org.apache.spark.api.java.function.%s" clazz)]
-        :prefix ~prefix-sym
-        :init ~'init
-        :state ~'state
-        :constructors {[Object] []})
-       (defn ~wrapper-name [f#]
-         (new ~new-class-sym
-              (if (serfn? f#) (binding [sfn/*serialize* kryo/serialize]
-                                (serialize-fn f#)) f#))))))
+  [clazz wrapper-name fn-symbol implemented-type]
+    (let [new-class-sym (mk-sym "flambo.function.%s" clazz)
+          prefix-sym (mk-sym "%s-" clazz)]
+      `(do
+         (def ~(mk-sym "%s-init" clazz) -init)
+         (def ~fn-symbol -call)
+         (gen-class
+           :name ~new-class-sym
+           :implements [~implemented-type java.io.Serializable]
+           :prefix ~prefix-sym
+           :init ~'init
+           :state ~'state
+           :constructors {[Object] []})
+         (defn ~wrapper-name [f#]
+           (new ~new-class-sym
+                (if (serfn? f#) (binding [sfn/*serialize* kryo/serialize]
+                                  (serialize-fn f#)) f#))))))
 
+(defmacro gen-spark-api-function
+  [clazz wrapper-name]
+    `(gen-function ~clazz ~wrapper-name ~(mk-sym "%s-call" clazz) ~(mk-sym "org.apache.spark.api.java.function.%s" clazz)))
+
+(gen-function Comparator comparator Comparator-compare java.util.Comparator)
 ;
-(gen-function Function function)
-(gen-function Function2 function2)
-(gen-function Function3 function3)
-(gen-function VoidFunction void-function)
-(gen-function FlatMapFunction flat-map-function)
-(gen-function FlatMapFunction2 flat-map-function2)
-(gen-function PairFlatMapFunction pair-flat-map-function)
-(gen-function PairFunction pair-function)
-(gen-function DoubleFlatMapFunction double-flat-map-function) ; A function that takes T, returns zero or more records of type Double from each input record.
-(gen-function DoubleFunction double-function) ; A function that takes T, returns Doubles, and can be used to construct DoubleRDDs.
+(gen-spark-api-function Function function)
+(gen-spark-api-function Function2 function2)
+(gen-spark-api-function Function3 function3)
+(gen-spark-api-function VoidFunction void-function)
+(gen-spark-api-function FlatMapFunction flat-map-function)
+(gen-spark-api-function FlatMapFunction2 flat-map-function2)
+(gen-spark-api-function PairFlatMapFunction pair-flat-map-function)
+(gen-spark-api-function PairFunction pair-function)
+(gen-spark-api-function DoubleFlatMapFunction double-flat-map-function) ; A function that takes T, returns zero or more records of type Double from each input record.
+(gen-spark-api-function DoubleFunction double-function)     ; A function that takes T, returns Doubles, and can be used to construct DoubleRDDs.
 
 ;; Replaces the PairFunction-call and PairFlatMapFunction-call defined by the gen-function macro.
 (defn PairFunction-call [this x]
