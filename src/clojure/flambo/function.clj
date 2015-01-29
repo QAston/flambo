@@ -81,3 +81,9 @@
     (for [v ret
           :let [[a b] v]]
       (Tuple2. a b))))
+
+(defn DoubleFunction-call [this x]
+  (double (-call this x)))
+
+(defn DoubleFlatMapFunction-call [this x]
+  (map double (-call this x)))

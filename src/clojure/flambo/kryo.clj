@@ -10,6 +10,8 @@
 ;; lol scala
 (def ^:no-doc OBJECT-CLASS-TAG (.apply ClassTag$/MODULE$ java.lang.Object))
 
+(def ^:no-doc DOUBLE-CLASS-TAG (.apply ClassTag$/MODULE$ java.lang.Double))
+
 (defn ^bytes serialize
   "We piggy back off of spark's kryo instance from `SparkEnv` since it already
   has all of our custom serializers and other things we need to serialize our functions."

@@ -10,8 +10,9 @@
 ;; happily accepted!
 ;;
 (ns flambo.api
-  (:refer-clojure :exclude [fn map reduce count take distinct filter group-by values comparator]
-                  :rename {first core-first})
+  (:refer-clojure :exclude [fn reduce count take distinct filter group-by values comparator min max sort-by]
+                  :rename {first core-first
+                           map core-map})
   (:require [serializable.fn :as sfn]
             [clojure.tools.logging :as log]
             [flambo.function :refer [flat-map-function
@@ -24,12 +25,14 @@
                                      void-function] :as ff]
             [flambo.conf :as conf]
             [flambo.utils :as u]
-            [flambo.kryo :as k])
+            [flambo.kryo :as k]
+            [flambo.kryo :as kryo])
   (:import [scala Tuple2]
            [java.util Comparator]
            [org.apache.spark.api.java JavaSparkContext StorageLevels
-                                      JavaRDD JavaDoubleRDD JavaPairRDD JavaFutureAction]
-           [org.apache.spark.rdd PartitionwiseSampledRDD]))
+                                      JavaRDD JavaDoubleRDD JavaPairRDD JavaFutureAction JavaRDDLike]
+           [org.apache.spark.rdd PartitionwiseSampledRDD]
+           (org.apache.spark SparkContext)))
 
 ;; flambo makes extensive use of kryo to serialize and deserialize clojure functions
 ;; and data structures. Here we ensure that these properties are set so they are inhereted
@@ -50,6 +53,16 @@
                      :memory-and-disk-2     StorageLevels/MEMORY_AND_DISK_2
                      :memory-and-disk-ser-2 StorageLevels/MEMORY_AND_DISK_SER_2
                      :disk-only-2           StorageLevels/DISK_ONLY_2})
+
+(def storage-memory-only StorageLevels/MEMORY_ONLY)
+(def storage-memory-and-disk StorageLevels/MEMORY_AND_DISK)
+(def storage-memory-and-disk-ser StorageLevels/MEMORY_AND_DISK_SER)
+(def storage-disk-only StorageLevels/DISK_ONLY)
+(def storage-memory-only-2 StorageLevels/MEMORY_ONLY_2)
+(def storage-memory-only-ser-2 StorageLevels/MEMORY_ONLY_SER_2)
+(def storage-memory-and-disk-2 StorageLevels/MEMORY_AND_DISK_2)
+(def storage-memory-and-disk-ser-2 StorageLevels/MEMORY_AND_DISK_SER_2)
+(def storage-disk-only-2 StorageLevels/DISK_ONLY_2)
 
 (defmacro fn
   [& body]
@@ -175,10 +188,10 @@
   ([spark-context lst] (.parallelize spark-context lst))
   ([spark-context lst num-slices] (.parallelize spark-context lst num-slices)))
 
-(defn union
-  "Build the union of two or more RDDs"
-  [context rdd & rdds]
-  (.union context rdd (java.util.ArrayList. rdds)))
+(defn parallelize-doubles
+  "Distributes a local collection to form/return a JavaDoubleRDD"
+  ([spark-context lst] (.parallelizeDoubles spark-context (core-map double lst)))
+  ([spark-context lst num-slices] (.parallelizeDoubles spark-context (core-map double lst) num-slices)))
 
 (defn partitionwise-sampled-rdd [rdd sampler preserve-partitioning? seed]
   "Creates a PartitionwiseSampledRRD from existing RDD and a sampler object"
@@ -204,6 +217,11 @@
   "Returns a new `JavaPairRDD` of (K, V) pairs by applying `f` to all elements of `rdd`."
   [rdd f]
   (.mapToPair rdd (pair-function f)))
+
+(defn map-to-double
+  "Returns a new `JavaDoubleRDD` pairs by applying `f` to all elements of `rdd`."
+  [rdd f]
+  (.mapToDouble rdd (ff/double-function f)))
 
 (defn reduce
   "Aggregates the elements of `rdd` using the function `f` (which takes two arguments
@@ -235,6 +253,11 @@
   [rdd f]
   (.flatMapToPair rdd (pair-flat-map-function f)))
 
+(defn flat-map-to-double
+  "Return a new JavaDoubleRDD by first applying a function to all elements of this RDD, and then flattening the results."
+  [rdd f]
+  (.flatMapToDouble rdd (ff/double-flat-map-function f)))
+
 (defn map-partition
   "Similar to `map`, but runs separately on each partition (block) of the `rdd`, so function `f`
   must be of type Iterator<T> => Iterable<U>.
@@ -247,11 +270,6 @@
   `i` represents the index of partition."
   [rdd f]
   (.mapPartitionsWithIndex rdd (function2 f) true))
-
-(defn filter
-  "Returns a new RDD containing only the elements of `rdd` that satisfy a predicate `f`."
-  [rdd f]
-  (.filter rdd (function (ftruthy? f))))
 
 (defn foreach
   "Applies the function `f` to all elements of `rdd`."
@@ -383,24 +401,11 @@
                         [a b] (untuple t2)]
                     (vector x [a (.orNull b)])))))))
 
-(defn sample
+(defn take-sample
   "Returns a `fraction` sample of `rdd`, with or without replacement,
   using a given random number generator `seed`."
   [rdd with-replacement? fraction seed]
-  (.sample rdd with-replacement? fraction seed))
-
-(defn coalesce
-  "Decrease the number of partitions in `rdd` to `n`.
-  Useful for running operations more efficiently after filtering down a large dataset."
-  ([rdd n]
-    (.coalesce rdd n))
-  ([rdd n shuffle?]
-    (.coalesce rdd n shuffle?)))
-
-(defn repartition
-  "Returns a new `rdd` with exactly `n` partitions."
-  [rdd n]
-  (.repartition rdd n))
+  (vec (.takeSample rdd with-replacement? fraction seed)))
 
 ;; ## Actions
 ;;
@@ -437,13 +442,6 @@
   [rdd path]
   (.saveAsSequenceFile rdd path))
 
-(defn persist
-  "Sets the storage level of `rdd` to persist its values across operations
-  after the first time it is computed. storage levels are available in the `STORAGE-LEVELS' map.
-  This can only be used to assign a new storage level if the RDD does not have a storage level set already."
-  [rdd storage-level]
-  (.persist rdd storage-level))
-
 (def first
   "Returns the first element of `rdd`."
   (memfn first))
@@ -456,20 +454,9 @@
   "Returns an RDD created by coalescing all elements of `rdd` within each partition into a list."
   (memfn glom))
 
-(def cache
-  "Persists `rdd` with the default storage level (`MEMORY_ONLY`)."
-  (memfn cache))
-
 (def collect
   "Returns all the elements of `rdd` as an ArrayList at the driver process."
   (memfn collect))
-
-(defn distinct
-  "Return a new RDD that contains the distinct elements of the source `rdd`."
-  ([rdd]
-    (.distinct rdd))
-  ([rdd n]
-    (.distinct rdd n)))
 
 (defn take
   "Return an array with the first n elements of `rdd`.
@@ -477,20 +464,6 @@
   program computes all the elements)."
   [rdd cnt]
   (.take rdd cnt))
-
-(defmulti histogram "compute histogram of an RDD of doubles"
-          (fn [_ bucket-arg] (sequential? bucket-arg)))
-
-(defmethod histogram true [rdd buckets]
-  (let [counts (-> (JavaDoubleRDD/fromRDD (.rdd rdd))
-                   (.histogram (double-array buckets)))]
-    (into [] counts)))
-
-(defmethod histogram false [rdd bucket-count]
-  (let [[buckets counts] (-> (JavaDoubleRDD/fromRDD (.rdd rdd))
-                             (.histogram bucket-count)
-                             untuple)]
-    [(into [] buckets) (into [] counts)]))
 
 ; tangramcare additions
 
@@ -524,7 +497,7 @@
 
 (defn take-largest
   "Returns the n largest elements from this RDD using the natural ordering for T, or ordering by comparator c.
-   C can be a clojure fn (f/fn without aot) returning -1,0,1 because clojure fns implement java.util.comparator, or you can use clojure.core/comparator."
+   C can be a clojure fn (f/fn without aot) returning -1,0,1 because clojure fns implement java.util.comparator, or you can use flambo.api/comparator."
   ([rdd n]
     (.top rdd n))
   ([rdd n c]
@@ -532,7 +505,7 @@
 
 (defn take-smallest
   "Returns the n smallest elements from this RDD using the natural ordering for T, or ordering by comparator c.
-   C can be a clojure fn (returning -1,0,1) because clojure fns implement java.util.comparator, or you can use clojure.core/comparator to create one or clojure.core.compare."
+   C can be a clojure fn (returning -1,0,1) because clojure fns implement java.util.comparator, or you can use flambo.api/comparator to create one or clojure.core.compare."
   ([rdd n]
     (.takeOrdered rdd n))
   ([rdd n c]
@@ -542,3 +515,248 @@
   "Returns the n items first in order of (pred x y) == true from this RDD."
   [rdd n pred]
   (.takeOrdered rdd n (ff/comparator (comparator pred))))
+
+(defn take-seq
+  "Return a clojure seq that contains all of the elements in this RDD.
+  The seq will consume as much memory as the largest partition in this RDD."
+  [rdd]
+  (iterator-seq (.toLocalIterator rdd)))
+
+(defn min
+  "Returns the minimum element from this RDD as defined by the specified Comparator[T] (optional)
+  C can be a clojure fn (returning -1,0,1) because clojure fns implement java.util.comparator, or you can use flambo.api/comparator to create one or clojure.core.compare."
+  ([rdd]
+    (.min rdd (ff/comparator compare)))
+  ([rdd c]
+    (.min rdd (ff/comparator c))))
+
+(defn max
+  "Returns the maximum element from this RDD as defined by the specified Comparator[T] (optional)
+  C can be a clojure fn (returning -1,0,1) because clojure fns implement java.util.comparator, or you can use flambo.api/comparator to create one or clojure.core.compare."
+  ([rdd]
+    (.max rdd (ff/comparator compare)))
+  ([rdd c]
+    (.max rdd (ff/comparator c))))
+
+(defn take-async
+  "The asynchronous version of the take action, which returns a future for retrieving the first num elements of this RDD.
+  This returns a regular java future, so all future related functions from clojure work."
+  [rdd n]
+  (.takeAsync rdd n))
+
+(defn num-partitions
+  "Returns number of partitions of this RDD."
+  [rdd]
+  (.size (.partitions rdd)))
+
+(defn to-seq
+  [])
+
+;;
+
+(defprotocol PHasContext
+  "Types capable of receiving spark context"
+  (^JavaSparkContext get-java-spark-context [this]))
+
+(extend-type SparkContext
+  PHasContext
+  (^JavaSparkContext get-java-spark-context [this]
+    (JavaSparkContext/fromSparkContext this)))
+
+(extend-type JavaRDDLike
+  PHasContext
+  (^JavaSparkContext get-java-spark-context [this]
+    (JavaSparkContext/fromSparkContext (.context this))))
+
+(defprotocol PConvertibleToJavaRDD
+  "Types convertible to JavaRDD"
+  (^JavaRDD to-java-rdd [this]))
+
+(extend-type JavaRDD
+  PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    this))
+
+(extend-type JavaRDDLike
+  PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    (JavaRDD/fromRDD (.rdd this) (.classTag this))))
+
+(defprotocol PConvertibleToDoubleRDD
+  "Types convertible to JavaDoubleRDD"
+  (^JavaDoubleRDD to-java-double-rdd [this]))
+
+(extend-type JavaDoubleRDD
+  PConvertibleToDoubleRDD
+  (^JavaDoubleRDD to-java-double-rdd [this]
+    this))
+
+(extend-type JavaRDDLike
+  PConvertibleToDoubleRDD
+  (^JavaDoubleRDD to-java-double-rdd [this]
+    (if (= (.classTag this) k/DOUBLE-CLASS-TAG)
+      (JavaDoubleRDD/fromRDD (.rdd this))
+      (map-to-double this identity))))
+
+;; JavaRDD common API
+
+(def cache
+  "Persists `rdd` with the default storage level (`MEMORY_ONLY`)."
+  (memfn cache))
+
+(defn coalesce
+  "Decrease the number of partitions in `rdd` to `n`.
+  Useful for running operations more efficiently after filtering down a large dataset."
+  ([rdd n]
+    (.coalesce rdd n))
+  ([rdd n shuffle?]
+    (.coalesce rdd n shuffle?)))
+
+(defn distinct
+  "Return a new RDD that contains the distinct elements of the source `rdd`."
+  ([rdd]
+    (.distinct rdd))
+  ([rdd n]
+    (.distinct rdd n)))
+
+(defn filter
+  "Returns a new RDD containing only the elements of `rdd` that satisfy a predicate `f`."
+  [rdd f]
+  (.filter rdd (function (ftruthy? f))))
+
+(defn intersection
+  "Return the intersection of this RDD and another one.
+  The output will not contain any duplicate elements, even if the input RDDs did.
+  Note that this method performs a shuffle internally."
+  [rdd other]
+  (.intersection rdd other))
+
+(defn persist
+  "Sets the storage level of `rdd` to persist its values across operations
+  after the first time it is computed. storage levels are available in the `STORAGE-LEVELS' map.
+  This can only be used to assign a new storage level if the RDD does not have a storage level set already."
+  [rdd storage-level]
+  (.persist rdd storage-level))
+
+(defn repartition
+  "Returns a new `rdd` with exactly `n` partitions.
+  Can increase or decrease the level of parallelism in this RDD. Internally, this uses a shuffle to redistribute data.
+  If you are decreasing the number of partitions in this RDD, consider using coalesce, which can avoid performing a shuffle."
+  [rdd n]
+  (.repartition rdd n))
+
+(defn sample
+  "Return a sampled subset of this RDD."
+  ([rdd with-replacement? fraction]
+    (.sample rdd with-replacement? (double fraction)))
+  ([rdd with-replacement? fraction seed]
+    (.sample rdd with-replacement? (double fraction) (long seed))))
+
+(defn set-name!
+  "Assign a name to this RDD"
+  [rdd new-name]
+  (.setName rdd new-name))
+
+(defn subtract
+  "Return an RDD with the elements from rdd that are not in other.
+  By default uses this partition size, because even if other is huge, the resulting RDD will be <= us."
+  ([rdd other-rdd]
+    (.subtract rdd other-rdd))
+  ([rdd other-rdd num-partitions]
+    (.subtract rdd other-rdd num-partitions)))
+
+(defn union
+  "Return the union of this RDD and others. Any identical elements will appear multiple times (use api/distinct to eliminate them)."
+  ([rdd]
+    rdd)
+  ([rdd & rdds]
+    (.union (get-java-spark-context rdd) rdd (java.util.ArrayList. rdds))))
+
+(defn unpersist
+  "Mark the RDD as non-persistent, and remove all blocks for it from memory and disk.
+  This method blocks until all blocks are deleted (by default)."
+  ([rdd]
+    (.unpersist rdd))
+  ([rdd blocking?]
+    (.unpersist rdd blocking?)))
+
+
+; JavaRDD specific api:
+(defn random-split
+  "Randomly splits this RDD with the provided weights.
+  weights - weights for splits, will be normalized if they don't sum to 1
+  seed (optional) - random seed
+  returns: split RDDs in an array"
+  ([rdd weights]
+    (vec (.randomSplit rdd (double-array weights))))
+  ([rdd weights seed]
+    (vec (.randomSplit rdd (double-array weights) (long seed)))))
+
+(defn sort-by
+  "Return this RDD sorted by the given key function."
+  ([rdd f]
+    (.sortBy rdd (function f) true (num-partitions rdd)))
+  ([rdd f ascending?]
+    (.sortBy rdd (function f) ascending? (num-partitions rdd)))
+  ([rdd f ascending? num-partitions]
+    (.sortBy rdd (function f) ascending? num-partitions)))
+
+; JavaDoubleRDD API
+
+(defmulti histogram "compute histogram of an RDD of doubles"
+          (fn [_ bucket-arg] (sequential? bucket-arg)))
+
+(defmethod histogram true [rdd buckets]
+  (let [counts (-> (to-java-double-rdd rdd)
+                   (.histogram (double-array buckets)))]
+    (into [] counts)))
+
+(defmethod histogram false [rdd bucket-count]
+  (let [[buckets counts] (-> (to-java-double-rdd rdd)
+                             (.histogram bucket-count)
+                             untuple)]
+    [(into [] buckets) (into [] counts)]))
+
+(defn mean
+  "Compute the mean of this RDD's elements."
+  [rdd]
+  (.mean (to-java-double-rdd rdd)))
+
+(defn sample-stdev
+  "Compute the sample standard deviation of this RDD's elements (which corrects for bias in estimating the standard deviation by dividing by N-1 instead of N)."
+  [rdd]
+  (.sampleStdev (to-java-double-rdd rdd)))
+
+(defn sample-variance
+  "Compute the sample variance of this RDD's elements (which corrects for bias in estimating the standard variance by dividing by N-1 instead of N)."
+  [rdd]
+  (.sampleVariance (to-java-double-rdd rdd)))
+
+(defn stats
+  "Return a stats map that captures the mean, variance and count of the RDD's elements in one operation."
+  [rdd]
+  (let [s (.stats (to-java-double-rdd rdd))]
+    {:count (.count s)
+     :max (.max s)
+     :min (.min s)
+     :mean (.mean s)
+     :sum (.sum s)
+     :stdev (.stdev s)
+     :variance (.variance s)
+     :sample-stdev (.sampleStdev s)
+     :sample-variance (.sampleVariance s)}))
+
+(defn stdev
+  "Compute the standard deviation of this RDD's elements."
+  [rdd]
+  (.stdev (to-java-double-rdd rdd)))
+
+(defn sum
+  "Add up the elements in this RDD."
+  [rdd]
+  (.sum (to-java-double-rdd rdd)))
+
+(defn variance
+  "Compute the variance of this RDD's elements."
+  [rdd]
+  (.variance (to-java-double-rdd rdd)))

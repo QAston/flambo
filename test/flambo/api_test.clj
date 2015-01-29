@@ -20,15 +20,7 @@
       (fact
         "round-trips a clojure vector"
         (-> (f/parallelize c [1 2 3 4 5]) f/collect vec) => (just [1 2 3 4 5]))
-
-      (fact
-        "union concats two RDDs"
-        (let [rdd1 (f/parallelize c [1 2 3 4])
-              rdd2 (f/parallelize c [11 12 13])
-              rdd3 (f/parallelize c [21 22 23])]
-          (-> (f/union c rdd1 rdd2 rdd3)
-              f/collect
-              vec) => (just [1 2 3 4 11 12 13 21 22 23] :in-any-order))))))
+      )))
 
 (facts
   "about serializable functions"
@@ -66,6 +58,41 @@
                  (conf/master "local[*]")
                  (conf/app-name "api-test"))]
     (f/with-context c conf
+
+      (fact
+        "union concats RDDs"
+        (let [rdd1 (f/parallelize c [1 2 3 4])
+              rdd2 (f/parallelize c [11 12 13])
+              rdd3 (f/parallelize c [21 22 23])]
+          (-> (f/union rdd1 rdd2 rdd3)
+              f/collect
+              vec) => (just [1 2 3 4 11 12 13 21 22 23] :in-any-order)))
+
+      (fact
+        "union concats DoubleRDDs"
+        (let [rdd1 (f/parallelize-doubles c [1 2 3 4])
+              rdd2 (f/parallelize-doubles c [11 12 13])
+              rdd3 (f/parallelize-doubles c [21 22 23])]
+          (-> (f/union rdd1 rdd2 rdd3)
+              f/collect
+              vec) => (just [1.0 2.0 3.0 4.0 11.0 12.0 13.0 21.0 22.0 23.0] :in-any-order)))
+
+      (fact
+        "intersection works on JavaRDDs"
+        (let [rdd1 (f/parallelize c [1 2 3 4])
+              rdd2 (f/parallelize c [1 3])]
+          (-> (f/intersection rdd1 rdd2)
+              f/collect
+              vec) => (just [1 3] :in-any-order)))
+
+      (fact
+        "subtract works on JavaRDDs"
+        (let [rdd1 (f/parallelize c [1 2 3 4])
+              rdd2 (f/parallelize c [1 3])]
+          (-> (f/subtract rdd1 rdd2)
+              f/collect
+              vec) => (just [2 4] :in-any-order)))
+
       (fact
         "map returns an RDD formed by passing each element of the source RDD through a function"
         (-> (f/parallelize c [1 2 3 4 5])
@@ -145,18 +172,6 @@
                               ["key2" [[3] nil]]] :in-any-order))
 
       (fact
-        "sample returns a fraction of the RDD, with/without replacement, Using a
-        given random number generator seed, Sampling does not guarantee size but
-        using same seed should return same result."
-        (-> (f/parallelize c [0 1 2 3 4 5 6 7 8 9])
-            (f/sample false 0.3 9)
-            f/collect
-            vec) => (-> (f/parallelize c [0 1 2 3 4 5 6 7 8 9])
-                        (f/sample false 0.3 9)
-                        f/collect
-                        vec))
-
-      (fact
         "combine-by-key returns an RDD by combining the elements for each key using a custom
         set of aggregation functions"
         (-> (f/parallelize c [["key1" 1]
@@ -175,6 +190,17 @@
             (f/sort-by-key compare false)
             f/collect
             vec) => [[5 "bb"] [3 "cc"] [2 "aa"] [1 "dd"]])
+
+
+      (fact
+        "sort-by returns an RDD sorted by given key function"
+        (-> (f/parallelize c [[2 "aa"]
+                              [5 "bb"]
+                              [3 "cc"]
+                              [1 "dd"]])
+            (f/sort-by second true)
+            f/collect
+            vec) => [[2 "aa"] [5 "bb"] [3 "cc"] [1 "dd"]])
 
       (fact
         "coalesce"
@@ -211,6 +237,13 @@
             f/collect
             vec) => [["Four" 1] ["score" 1] ["and" 1] ["seven" 1] ["years" 1] ["ago" 1]])
 
+
+      (fact
+        "flat-map-to-double"
+        (-> (f/parallelize c [0])
+            (f/flat-map-to-double (f/fn [x] [1 2 3 4]))
+            f/collect) => [1.0 2.0 3.0 4.0])
+
       (fact
         "map-partition"
         (-> (f/parallelize c [0 1 2 3 4])
@@ -233,8 +266,17 @@
               f/collect
               vec) => (just [[1 5] [1 6] [1 7] [2 5] [2 6] [2 7]] :in-any-order)))
 
-      (future-fact "repartition returns a new RDD with exactly n partitions")
+      (fact
+        "repartition partitions RDD to a number of partitions"
+        (-> (f/parallelize c [0 1 2 3 4])
+            (f/repartition 5)
+            (f/num-partitions))=> 5 )
 
+      (fact
+        "random split splits rdd  with the provided weights"
+        (-> (f/parallelize c [0 1 2 3 4])
+            (f/random-split [0.5 0.5] 9)
+            (count))=> 2)
       )))
 
 (facts
@@ -343,6 +385,16 @@
             (f/take 3)) => [1 2 3])
 
       (fact
+        "take-async returns an array with the first n elements of an RDD"
+        @(-> (f/parallelize c [1 2 3 4 5])
+            (f/take-async 3)) => [1 2 3])
+
+      (fact
+        "take returns an array with the first n elements of an RDD"
+        (-> (f/parallelize c [1 2 3 4 5], 3)
+            (f/take-seq)) => (list 1 2 3 4 5))
+
+      (fact
         "glom returns an RDD created by coalescing all elements within each partition into a list"
         (-> (f/parallelize c [1 2 3 4 5 6 7 8 9 10] 2)
             f/glom
@@ -357,6 +409,29 @@
               f/collect) => [1 2 3 4 5]))
 
       (fact
+        "take-sample returns a fraction of the RDD, with/without replacement, Using a
+        given random number generator seed, Sampling does not guarantee size but
+        using same seed should return same result."
+        (-> (f/parallelize c [0 1 2 3 4 5 6 7 8 9])
+            (f/take-sample false 0.3 9)
+            ) => (-> (f/parallelize c [0 1 2 3 4 5 6 7 8 9])
+                     (f/take-sample false 0.3 9)
+                        ))
+
+
+      (fact
+        "sample returns a fraction of the RDD, with/without replacement, Using a
+        given random number generator seed, Sampling does not guarantee size but
+        using same seed should return same result."
+        (-> (f/parallelize c [0 1 2 3 4 5 6 7 8 9])
+            (f/sample false 0.3 9)
+            f/collect
+            vec) => (-> (f/parallelize c [0 1 2 3 4 5 6 7 8 9])
+                        (f/sample false 0.3 9)
+                        f/collect
+                        vec))
+
+      (fact
         "histogram uses bucketCount number of evenly-spaced buckets"
         (-> (f/parallelize c [1.0 2.2 2.6 3.3 3.5 3.7 4.4 4.8 5.5 6.0])
             (f/histogram 5)) => [[1.0 2.0 3.0 4.0 5.0 6.0] [1 2 3 2 2]])
@@ -365,6 +440,52 @@
         "histogram uses the provided buckets"
         (-> (f/parallelize c [1.0 2.2 2.6 3.3 3.5 3.7 4.4 4.8 5.5 6.0])
             (f/histogram [1.0 4.0 6.0])) => [6 4])
+
+      (fact
+        "mean calculates mean"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/mean)) => 2.0)
+
+      (fact
+        "stdev calculates standard deviantion"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/stdev)) => (roughly 0.8164965))
+
+      (fact
+        "sum calculates sum"
+        (-> (f/parallelize c [1 2 3])
+            (f/sum)) => (roughly 6.0))
+
+      (fact
+        "min calculates min"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/min)) => (roughly 1.0))
+
+      (fact
+        "max calculates max"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/max)) => 3.0)
+
+      (fact
+        "variance calculates variance"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/variance)) => (roughly 0.66666))
+
+      (fact
+        "sample-variance calculates sample-variance"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/sample-variance)) => 1.0)
+
+      (fact
+        "sample-stdev calculates sample-stdev"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/sample-stdev)) => 1.0)
+
+      (fact
+        "stats return a map with stats"
+        (-> (f/parallelize c [1.0 2.0 3.0])
+            (f/stats)
+            :mean) => 2.0)
       )))
 
 (facts
@@ -380,7 +501,25 @@
                 (f/collect-async)) => [1 2 3 4 5])
       (fact "async-count works like count"
             @(-> (f/parallelize c [1 2 3 4 5])
-                 (f/count-async)) => 5)))
+                 (f/count-async)) => 5))))
+
+(facts
+  "about rdd strorage management"
+
+  (let [conf (-> (conf/spark-conf)
+                 (conf/master "local[*]")
+                 (conf/app-name "api-test"))]
+    (f/with-context c conf
+
+      (fact "cache doesn't crash"
+            (-> (f/parallelize c [1 2 3 4 5])
+                 (f/cache)) => anything)
+
+      (fact "persist/unpersist doesn't crash"
+            (-> (f/parallelize c [1 2 3 4 5])
+                (f/persist f/storage-memory-only)
+                (f/unpersist)) => anything)
+      )))
 
 (facts
   "about take sort variants"
