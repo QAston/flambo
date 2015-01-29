@@ -18,6 +18,8 @@
                         ["releases" "http://exotica.itx.pl:8080/nexus-2.8.0-05/repositories/releases/"]]
 
   :aot [flambo.function
+        flambo.api
+        flambo.sql
         flambo.kryo.sfn-serializer
         flambo.example.tfidf
         ]

@@ -69,6 +69,14 @@
               vec) => (just [1 2 3 4 11 12 13 21 22 23] :in-any-order)))
 
       (fact
+        "union concats RDDs"
+        (let [rdd1 (f/parallelize c [1 2 3 4])
+              rdd3 (f/parallelize c [21 22 23])]
+          (-> (f/union rdd1 rdd3)
+              f/collect
+              vec) => (just [1 2 3 4 21 22 23] :in-any-order)))
+
+      (fact
         "union concats DoubleRDDs"
         (let [rdd1 (f/parallelize-doubles c [1 2 3 4])
               rdd2 (f/parallelize-doubles c [11 12 13])

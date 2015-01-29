@@ -147,20 +147,20 @@
   (let [clazz (Class/forName (clojure.string/replace (str ns) #"-" "_"))]
     (JavaSparkContext/jarOfClass clazz)))
 
-(defsparkfn untuple [^Tuple2 t]
+(defn untuple [^Tuple2 t]
   (let [v (transient [])]
     (conj! v (._1 t))
     (conj! v (._2 t))
     (persistent! v)))
 
-(defsparkfn double-untuple [^Tuple2 t]
+(defn double-untuple [^Tuple2 t]
   (let [[x ^Tuple2 t2] (untuple t)
         v (transient [])]
     (conj! v x)
     (conj! v (untuple t2))
     (persistent! v)))
 
-(defsparkfn group-untuple [^Tuple2 t]
+(defn group-untuple [^Tuple2 t]
   (let [v (transient [])]
     (conj! v (._1 t))
     (conj! v (into [] (._2 t)))
@@ -549,9 +549,6 @@
   [rdd]
   (.size (.partitions rdd)))
 
-(defn to-seq
-  [])
-
 ;;
 
 (defprotocol PHasContext
@@ -665,12 +662,22 @@
   ([rdd other-rdd num-partitions]
     (.subtract rdd other-rdd num-partitions)))
 
+(defprotocol PUnionCapableRDD
+  "Types convertible to JavaRDD"
+  (union-impl [rdd rdds]))
+
+(extend-type JavaRDDLike
+  PUnionCapableRDD
+  (union-impl [rdd rdds]
+    (.union (get-java-spark-context rdd) rdd (java.util.ArrayList. rdds))))
+
 (defn union
   "Return the union of this RDD and others. Any identical elements will appear multiple times (use api/distinct to eliminate them)."
   ([rdd]
     rdd)
   ([rdd & rdds]
-    (.union (get-java-spark-context rdd) rdd (java.util.ArrayList. rdds))))
+    (union-impl rdd rdds))
+  )
 
 (defn unpersist
   "Mark the RDD as non-persistent, and remove all blocks for it from memory and disk.
