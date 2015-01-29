@@ -208,6 +208,13 @@
 ;;
 ;; Function for transforming RDDs
 ;;
+
+(defn count-by-value
+  "Return the count of each unique value in `rdd` as a map of (value, count)
+  pairs."
+  [rdd]
+  (into {} (.countByValue rdd)))
+
 (defn map
   "Returns a new RDD formed by passing each element of the source through the function `f`."
   [rdd f]
@@ -225,21 +232,10 @@
 
 (defn reduce
   "Aggregates the elements of `rdd` using the function `f` (which takes two arguments
-  and returns one). The function should be commutative and associative so that it can be
-  computed correctly in parallel."
+  and returns one). The function should be commutative (a+b = b+a) and associative so that it can be
+  computed correctly in parallel. For non-commutative `f` use fold."
   [rdd f]
   (.reduce rdd (function2 f)))
-
-(defmulti values class)
-(defmethod values JavaRDD
-  [rdd]
-  (-> rdd
-      (map-to-pair identity)
-      .values))
-
-(defmethod values JavaPairRDD
-  [rdd]
-  (.values rdd))
 
 (defn flat-map
   "Similar to `map`, but each input item can be mapped to 0 or more output items (so the
@@ -290,18 +286,10 @@
 
 (defn fold
   "Aggregates the elements of each partition, and then the results for all the partitions,
-  using a given associative function and a neutral 'zero value'"
+  using a given associative function and a neutral 'zero value'.
+  For commutative `f` use reduce because it's faster."
   [rdd zero-value f]
   (.fold rdd zero-value (function2 f)))
-
-(defn reduce-by-key
-  "When called on an `rdd` of (K, V) pairs, returns an RDD of (K, V) pairs
-  where the values for each key are aggregated using the given reduce function `f`."
-  [rdd f]
-  (-> rdd
-      (map-to-pair identity)
-      (.reduceByKey (function2 f))
-      (.map (function untuple))))
 
 (defn cartesian
   "Creates the cartesian product of two RDDs returning an RDD of pairs"
@@ -320,87 +308,6 @@
         (.groupBy (function f) n)
         (.map (function group-untuple)))))
 
-(defn group-by-key
-  "Groups the values for each key in `rdd` into a single sequence."
-  ([rdd]
-    (-> rdd
-        (map-to-pair identity)
-        .groupByKey
-        (.map (function group-untuple))))
-  ([rdd n]
-    (-> rdd
-        (map-to-pair identity)
-        (.groupByKey n)
-        (.map (function group-untuple)))))
-
-(defn combine-by-key
-  "Combines the elements for each key using a custom set of aggregation functions.
-  Turns an RDD of (K, V) pairs into a result of type (K, C), for a 'combined type' C.
-  Note that V and C can be different -- for example, one might group an RDD of type
-  (Int, Int) into an RDD of type (Int, List[Int]).
-  Users must provide three functions:
-  -- createCombiner, which turns a V into a C (e.g., creates a one-element list)
-  -- mergeValue, to merge a V into a C (e.g., adds it to the end of a list)
-  -- mergeCombiners, to combine two C's into a single one."
-  ([rdd create-combiner merge-value merge-combiners]
-    (-> rdd
-        (map-to-pair identity)
-        (.combineByKey (function create-combiner)
-                       (function2 merge-value)
-                       (function2 merge-combiners))
-        (.map (function untuple))))
-  ([rdd create-combiner merge-value merge-combiners n]
-    (-> rdd
-        (map-to-pair identity)
-        (.combineByKey (function create-combiner)
-                       (function2 merge-value)
-                       (function2 merge-combiners)
-                       n)
-        (.map (function untuple)))))
-
-(defn sort-by-key
-  "When called on `rdd` of (K, V) pairs where K implements ordered, returns a dataset of
-   (K, V) pairs sorted by keys in ascending or descending order, as specified by the boolean
-  ascending argument."
-  ([rdd]
-    (sort-by-key rdd compare true))
-  ([rdd x]
-    ;; RDD has a .sortByKey signature with just a Boolean arg, but it doesn't
-    ;; seem to work when I try it, bool is ignored.
-    (if (instance? Boolean x)
-      (sort-by-key rdd compare x)
-      (sort-by-key rdd x true)))
-  ([rdd compare-fn asc?]
-    (-> rdd
-        (map-to-pair identity)
-        (.sortByKey
-          (ff/comparator compare-fn)
-          (u/truthy? asc?))
-        (.map (function untuple)))))
-
-(defn join
-  "When called on `rdd` of type (K, V) and (K, W), returns a dataset of
-  (K, (V, W)) pairs with all pairs of elements for each key."
-  [rdd other]
-  (-> rdd
-      (map-to-pair identity)
-      (.join (map-to-pair other identity))
-      (.map (function double-untuple))))
-
-(defn left-outer-join
-  "Performs a left outer join of `rdd` and `other`. For each element (K, V)
-   in the RDD, the resulting RDD will either contain all pairs (K, (V, W)) for W in other,
-  or the pair (K, (V, nil)) if no elements in other have key K."
-  [rdd other]
-  (-> rdd
-      (map-to-pair identity)
-      (.leftOuterJoin (map-to-pair other identity))
-      (.map (function
-              (fn [t]
-                  (let [[x t2] (untuple t)
-                        [a b] (untuple t2)]
-                    (vector x [a (.orNull b)])))))))
-
 (defn take-sample
   "Returns a `fraction` sample of `rdd`, with or without replacement,
   using a given random number generator `seed`."
@@ -411,20 +318,6 @@
 ;;
 ;; Action return their results to the driver process.
 ;;
-(defn count-by-key
-  "Only available on RDDs of type (K, V).
-  Returns a map of (K, Int) pairs with the count of each key."
-  [rdd]
-  (into {}
-        (-> rdd
-            (map-to-pair identity)
-            .countByKey)))
-
-(defn count-by-value
-  "Return the count of each unique value in `rdd` as a map of (value, count)
-  pairs."
-  [rdd]
-  (into {} (.countByValue rdd)))
 
 (defn save-as-text-file
   "Writes the elements of `rdd` as a text file (or set of text files)
@@ -594,6 +487,22 @@
     (if (= (.classTag this) k/DOUBLE-CLASS-TAG)
       (JavaDoubleRDD/fromRDD (.rdd this))
       (map-to-double this identity))))
+
+(defprotocol PConvertibleToPairRDD
+  "Types convertible to JavaPairRDD"
+  (^JavaPairRDD to-java-pair-rdd [this]))
+
+(extend-type JavaPairRDD
+  PConvertibleToPairRDD
+  (^JavaPairRDD to-java-pair-rdd [this]
+    this))
+
+(extend-type JavaRDDLike
+  PConvertibleToPairRDD
+  (^JavaPairRDD to-java-pair-rdd [this]
+    (if (= (.classTag this) k/TUPLE-CLASS-TAG)
+      (JavaPairRDD/fromRDD (.rdd this) k/FAKE-CLASS-TAG k/FAKE-CLASS-TAG)
+      (map-to-pair this identity))))
 
 ;; JavaRDD common API
 
@@ -767,3 +676,115 @@
   "Compute the variance of this RDD's elements."
   [rdd]
   (.variance (to-java-double-rdd rdd)))
+
+;; JavaPairRDD specific API
+
+(defn count-by-key
+  "Only available on RDDs of type (K, V).
+  Returns a map of (K, Int) pairs with the count of each key."
+  [rdd]
+  (into {}
+        (-> rdd
+            (to-java-pair-rdd)
+            .countByKey)))
+
+(defmulti values class)
+(defmethod values JavaRDD
+  [rdd]
+  (-> rdd
+      (map-to-pair identity)
+      .values))
+
+(defmethod values JavaPairRDD
+  [rdd]
+  (.values rdd))
+
+(defn reduce-by-key
+  "When called on an `rdd` of (K, V) pairs, returns an RDD of (K, V) pairs
+  where the values for each key are aggregated using the given reduce function `f`."
+  [rdd f]
+  (-> rdd
+      (to-java-pair-rdd)
+      (.reduceByKey (function2 f))
+      (.map (function untuple))))
+
+(defn group-by-key
+  "Groups the values for each key in `rdd` into a single sequence."
+  ([rdd]
+    (-> rdd
+        (to-java-pair-rdd)
+        .groupByKey
+        (.map (function group-untuple))))
+  ([rdd n]
+    (-> rdd
+        (to-java-pair-rdd)
+        (.groupByKey n)
+        (.map (function group-untuple)))))
+
+(defn combine-by-key
+  "Combines the elements for each key using a custom set of aggregation functions.
+  Turns an RDD of (K, V) pairs into a result of type (K, C), for a 'combined type' C.
+  Note that V and C can be different -- for example, one might group an RDD of type
+  (Int, Int) into an RDD of type (Int, List[Int]).
+  Users must provide three functions:
+  -- createCombiner, which turns a V into a C (e.g., creates a one-element list)
+  -- mergeValue, to merge a V into a C (e.g., adds it to the end of a list)
+  -- mergeCombiners, to combine two C's into a single one."
+  ([rdd create-combiner merge-value merge-combiners]
+    (-> rdd
+        (to-java-pair-rdd)
+        (.combineByKey (function create-combiner)
+                       (function2 merge-value)
+                       (function2 merge-combiners))
+        (.map (function untuple))))
+  ([rdd create-combiner merge-value merge-combiners n]
+    (-> rdd
+        (to-java-pair-rdd)
+        (.combineByKey (function create-combiner)
+                       (function2 merge-value)
+                       (function2 merge-combiners)
+                       n)
+        (.map (function untuple)))))
+
+(defn sort-by-key
+  "When called on `rdd` of (K, V) pairs where K implements ordered, returns a dataset of
+   (K, V) pairs sorted by keys in ascending or descending order, as specified by the boolean
+  ascending argument."
+  ([rdd]
+    (sort-by-key rdd compare true))
+  ([rdd x]
+    ;; RDD has a .sortByKey signature with just a Boolean arg, but it doesn't
+    ;; seem to work when I try it, bool is ignored.
+    (if (instance? Boolean x)
+      (sort-by-key rdd compare x)
+      (sort-by-key rdd x true)))
+  ([rdd compare-fn asc?]
+    (-> rdd
+        (to-java-pair-rdd)
+        (.sortByKey
+          (ff/comparator compare-fn)
+          (u/truthy? asc?))
+        (.map (function untuple)))))
+
+(defn join
+  "When called on `rdd` of type (K, V) and (K, W), returns a dataset of
+  (K, (V, W)) pairs with all pairs of elements for each key."
+  [rdd other]
+  (-> rdd
+      (to-java-pair-rdd)
+      (.join (to-java-pair-rdd other))
+      (.map (function double-untuple))))
+
+(defn left-outer-join
+  "Performs a left outer join of `rdd` and `other`. For each element (K, V)
+   in the RDD, the resulting RDD will either contain all pairs (K, (V, W)) for W in other,
+  or the pair (K, (V, nil)) if no elements in other have key K."
+  [rdd other]
+  (-> rdd
+      (to-java-pair-rdd)
+      (.leftOuterJoin (to-java-pair-rdd other))
+      (.map (function
+              (fn [t]
+                  (let [[x t2] (untuple t)
+                        [a b] (untuple t2)]
+                    (vector x [a (.orNull b)])))))))

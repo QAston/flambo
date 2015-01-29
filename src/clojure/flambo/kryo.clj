@@ -5,12 +5,18 @@
            [org.apache.spark SparkEnv]
            [org.apache.spark.serializer SerializerInstance]
            [java.nio ByteBuffer]
-           [scala.reflect ClassTag$]))
+           [scala.reflect ClassTag$]
+           (scala Tuple2)
+           (org.apache.spark.api.java JavaSparkContext$)))
 
 ;; lol scala
 (def ^:no-doc OBJECT-CLASS-TAG (.apply ClassTag$/MODULE$ java.lang.Object))
 
 (def ^:no-doc DOUBLE-CLASS-TAG (.apply ClassTag$/MODULE$ java.lang.Double))
+
+(def ^:no-doc TUPLE-CLASS-TAG (.apply ClassTag$/MODULE$ Tuple2))
+
+(def ^:no-doc FAKE-CLASS-TAG (.fakeClassTag JavaSparkContext$/MODULE$))
 
 (defn ^bytes serialize
   "We piggy back off of spark's kryo instance from `SparkEnv` since it already
