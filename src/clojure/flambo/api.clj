@@ -10,9 +10,9 @@
 ;; happily accepted!
 ;;
 (ns flambo.api
-  (:refer-clojure :exclude [fn reduce count take distinct filter group-by values comparator min max sort-by]
+  (:refer-clojure :exclude [fn reduce count take distinct filter group-by values comparator min max sort-by keys]
                   :rename {first core-first
-                           map core-map})
+                           map   core-map})
   (:require [serializable.fn :as sfn]
             [clojure.tools.logging :as log]
             [flambo.function :refer [flat-map-function
@@ -230,13 +230,6 @@
   [rdd f]
   (.mapToDouble rdd (ff/double-function f)))
 
-(defn reduce
-  "Aggregates the elements of `rdd` using the function `f` (which takes two arguments
-  and returns one). The function should be commutative (a+b = b+a) and associative so that it can be
-  computed correctly in parallel. For non-commutative `f` use fold."
-  [rdd f]
-  (.reduce rdd (function2 f)))
-
 (defn flat-map
   "Similar to `map`, but each input item can be mapped to 0 or more output items (so the
   function `f` should return a collection rather than a single item)"
@@ -276,20 +269,6 @@
   "Applies the function `f` to each partition iterator of `rdd`."
   [rdd f]
   (.foreachPartition rdd (void-function f)))
-
-(defn aggregate
-  "Aggregates the elements of each partition, and then the results for all the partitions,
-  using a given combine function and a neutral 'zero value'.
-  aggregate(U zeroValue, Function2<U,T,U> seqOp, Function2<U,U,U> combOp)"
-  [rdd zero-value seq-op comb-op]
-  (.aggregate rdd zero-value (function2 seq-op) (function2 comb-op)))
-
-(defn fold
-  "Aggregates the elements of each partition, and then the results for all the partitions,
-  using a given associative function and a neutral 'zero value'.
-  For commutative `f` use reduce because it's faster."
-  [rdd zero-value f]
-  (.fold rdd zero-value (function2 f)))
 
 (defn cartesian
   "Creates the cartesian product of two RDDs returning an RDD of pairs"
@@ -357,6 +336,32 @@
   program computes all the elements)."
   [rdd cnt]
   (.take rdd cnt))
+
+(defn aggregate
+  "Higher order function: aggregate(U zeroValue, Function2<U,T,U> seq-op, Function2<U,U,U> comb-op)
+  First, for each partition, init aggregation-value with `zero-value` and then apply `seqOp` (taking 2 args, returning 1)
+  to the aggregation-result and each next partition element till there's nothing left,
+  ten do a flambo.api/reduce (initilised with zero-value) using `comb-op`(associative, commutative) on partition results.
+  and apply `comb-op` the aggregation-value and each next partition result till there's nothing left"
+  [rdd zero-value seq-op comb-op]
+  (.aggregate rdd zero-value (function2 seq-op) (function2 comb-op)))
+
+(defn fold-left
+  "Higher order function:
+  First, for each partition, init aggregation-value with `zero-value` and then apply `f` (taking 2 args, returning 1)
+  to the aggregation-result and each next partition element till there's nothing left,
+  ten do a flambo.api/reduce (initilised with zero-value) using `f`(this time associative, commutative) on partition results.
+  Equivalent of (aggregate r zero-value f f).
+  For commutative `f` reduce can be used instead (it's equivalent) and will be faster. "
+  [rdd zero-value f]
+  (.fold rdd zero-value (function2 f)))
+
+(defn reduce
+  "Applies the `f`(taking 2 args, returning 1) to each 2 elements (in no particular order) of the rdd and resulting values until there's one value left.
+  The function should be commutative (a+b = b+a) and associative so that it can be
+  computed correctly in parallel - faster than fold. For non-commutative `f` use fold."
+  [rdd f]
+  (.reduce rdd (function2 f)))
 
 ; tangramcare additions
 
@@ -568,8 +573,8 @@
   By default uses this partition size, because even if other is huge, the resulting RDD will be <= us."
   ([rdd other-rdd]
     (.subtract rdd other-rdd))
-  ([rdd other-rdd num-partitions]
-    (.subtract rdd other-rdd num-partitions)))
+  ([rdd other-rdd partitions]
+    (.subtract rdd other-rdd partitions)))
 
 (defprotocol PUnionCapableRDD
   "Types convertible to JavaRDD"
@@ -652,14 +657,14 @@
   "Return a stats map that captures the mean, variance and count of the RDD's elements in one operation."
   [rdd]
   (let [s (.stats (to-java-double-rdd rdd))]
-    {:count (.count s)
-     :max (.max s)
-     :min (.min s)
-     :mean (.mean s)
-     :sum (.sum s)
-     :stdev (.stdev s)
-     :variance (.variance s)
-     :sample-stdev (.sampleStdev s)
+    {:count           (.count s)
+     :max             (.max s)
+     :min             (.min s)
+     :mean            (.mean s)
+     :sum             (.sum s)
+     :stdev           (.stdev s)
+     :variance        (.variance s)
+     :sample-stdev    (.sampleStdev s)
      :sample-variance (.sampleVariance s)}))
 
 (defn stdev
@@ -678,26 +683,6 @@
   (.variance (to-java-double-rdd rdd)))
 
 ;; JavaPairRDD specific API
-
-(defn count-by-key
-  "Only available on RDDs of type (K, V).
-  Returns a map of (K, Int) pairs with the count of each key."
-  [rdd]
-  (into {}
-        (-> rdd
-            (to-java-pair-rdd)
-            .countByKey)))
-
-(defmulti values class)
-(defmethod values JavaRDD
-  [rdd]
-  (-> rdd
-      (map-to-pair identity)
-      .values))
-
-(defmethod values JavaPairRDD
-  [rdd]
-  (.values rdd))
 
 (defn reduce-by-key
   "When called on an `rdd` of (K, V) pairs, returns an RDD of (K, V) pairs
@@ -788,3 +773,78 @@
                   (let [[x t2] (untuple t)
                         [a b] (untuple t2)]
                     (vector x [a (.orNull b)])))))))
+
+
+(defn count-by-key
+  "Only available on RDDs of type (K, V).
+  Returns a map of (K, Int) pairs with the count of each key."
+  [rdd]
+  (into {}
+        (-> rdd
+            (to-java-pair-rdd)
+            .countByKey)))
+
+(defn values
+  "for given PairRDD returns JavaRDD of values of all pairs"
+  [rdd]
+  (-> rdd
+      (to-java-pair-rdd)
+      (.values)))
+
+(defn keys
+  "for given PairRDD returns JavaRDD of keys of all pairs"
+  [rdd]
+  (-> rdd
+      (to-java-pair-rdd)
+      (.keys)))
+
+(defn aggregate-by-key
+  "Aggregate the values of each key, using given combine functions and a neutral 'zero value'
+  returns a JavaPairRDD of [key flambo.api/aggregate on key values]"
+  ([rdd zero-value seq-op comb-op]
+    (.aggregateByKey (to-java-pair-rdd rdd) zero-value (function2 seq-op) (function2 comb-op)))
+  ([rdd zero-value partitions seq-op comb-op]
+    (.aggregateByKey (to-java-pair-rdd rdd) zero-value partitions (function2 seq-op) (function2 comb-op))))
+
+(defn fold-left-by-key
+  "Fold-left the values of each key, using given combine functions and a neutral 'zero value'
+  returns a JavaPairRDD of [key flambo.api/fold-left on key values]"
+  ([rdd zero-value f]
+    (.foldByKey (to-java-pair-rdd rdd) zero-value (function2 f) ))
+  ([rdd zero-value partitions f]
+    (.foldByKey (to-java-pair-rdd rdd) zero-value partitions (function2 f))))
+
+(defn subtract-by-key
+  "Return an RDD with the pairs from this whose keys are not in other..
+  By default uses this partition size, because even if other is huge, the resulting RDD will be <= us."
+  ([rdd other-rdd]
+    (.subtractByKey (to-java-pair-rdd rdd) (to-java-pair-rdd other-rdd)))
+  ([rdd other-rdd partitions]
+    (.subtractByKey (to-java-pair-rdd rdd) (to-java-pair-rdd other-rdd) partitions)))
+
+(defn map-values
+  "Pass each value in the key-value pair RDD through a map function without changing the keys; this also retains the original RDD's partitioning."
+  [rdd f]
+  (.mapValues (to-java-pair-rdd rdd) (ff/function f)))
+
+(defn flat-map-values
+  "Pass each value in the key-value pair RDD through a flatMap function without changing the keys; this also retains the original RDD's partitioning."
+  [rdd f]
+  (.flatMapValues (to-java-pair-rdd rdd) (ff/function f)))
+
+(defn collect-as-map
+  "Return the key-value pairs in this RDD to the master as a Map."
+  [rdd]
+  (into {}
+        (.collectAsMap (to-java-pair-rdd rdd))))
+
+(defn collect-as-map
+  "Return the key-value pairs in this RDD to the master as a Map."
+  [rdd]
+  (into {}
+        (.collectAsMap (to-java-pair-rdd rdd))))
+
+(defn lookup
+  "Return the list of values in the RDD for key key."
+  [rdd key]
+  (.lookup (to-java-pair-rdd rdd) key))

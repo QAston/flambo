@@ -278,13 +278,13 @@
         "repartition partitions RDD to a number of partitions"
         (-> (f/parallelize c [0 1 2 3 4])
             (f/repartition 5)
-            (f/num-partitions))=> 5 )
+            (f/num-partitions)) => 5)
 
       (fact
         "random split splits rdd  with the provided weights"
         (-> (f/parallelize c [0 1 2 3 4])
             (f/random-split [0.5 0.5] 9)
-            (count))=> 2)
+            (count)) => 2)
       )))
 
 (facts
@@ -299,6 +299,28 @@
         return type is a value"
         (-> (f/parallelize c [1 2 3 4 5])
             (f/reduce (f/fn [x y] (+ x y)))) => 15)
+
+      (fact
+        "aggregates elements of RDD using a function that takes two arguments and returns one,
+        return type is a value"
+        (-> (f/parallelize c [1 2 3 4 5])
+            (f/reduce +)) => 15)
+
+      (fact
+        "fold will not reorder elements inside partition, but can reorder partitions"
+        (-> (f/parallelize c [1 2 3 4 5], 2)
+            (f/fold [] conj)) => (just [[3 4 5] [1 2]] :in-any-order))
+
+      (fact
+        "fold is the same as (aggregate r zero-value f f)"
+        (-> (f/parallelize c [1 2 3 4], 2)
+            (f/aggregate [] conj conj)) => (just [[3 4] [1 2]] :in-any-order))
+
+      (fact
+        "aggregate will add 1 to each partition and then merge them into string in any order, but 1 will be always first"
+        (-> (f/parallelize c [0 1 2 3], 2)
+            (f/aggregate 1 + str)
+            (seq)) => (just (seq "126") :in-any-order))
 
       (fact
         "count-by-key returns a hashmap of (K, int) pairs with the count of each key; only available on RDDs of type (K, V)"
@@ -352,12 +374,6 @@
             (f/foreach-partition (f/fn [it] (iterator-seq it)))) => nil)
 
       (fact
-        "fold returns aggregate each partition, and then the results for all the partitions,
-        using a given associative function and a neutral 'zero value'"
-        (-> (f/parallelize c [1 2 3 4 5])
-            (f/fold 0 (f/fn [x y] (+ x y)))) => 15)
-
-      (fact
         "first returns the first element of an RDD"
         (-> (f/parallelize c [1 2 3 4 5])
             f/first) => 1)
@@ -395,7 +411,7 @@
       (fact
         "take-async returns an array with the first n elements of an RDD"
         @(-> (f/parallelize c [1 2 3 4 5])
-            (f/take-async 3)) => [1 2 3])
+             (f/take-async 3)) => [1 2 3])
 
       (fact
         "take returns an array with the first n elements of an RDD"
@@ -424,7 +440,7 @@
             (f/take-sample false 0.3 9)
             ) => (-> (f/parallelize c [0 1 2 3 4 5 6 7 8 9])
                      (f/take-sample false 0.3 9)
-                        ))
+                     ))
 
 
       (fact
@@ -506,7 +522,7 @@
 
       (fact "async-collect works like collect"
             @(-> (f/parallelize c [1 2 3 4 5])
-                (f/collect-async)) => [1 2 3 4 5])
+                 (f/collect-async)) => [1 2 3 4 5])
       (fact "async-count works like count"
             @(-> (f/parallelize c [1 2 3 4 5])
                  (f/count-async)) => 5))))
@@ -521,7 +537,7 @@
 
       (fact "cache doesn't crash"
             (-> (f/parallelize c [1 2 3 4 5])
-                 (f/cache)) => anything)
+                (f/cache)) => anything)
 
       (fact "persist/unpersist doesn't crash"
             (-> (f/parallelize c [1 2 3 4 5])
@@ -539,7 +555,7 @@
 
       (fact "returns largest nums"
             (-> (f/parallelize c [1 2 3 4 5])
-                 (f/take-largest 2)) => [5 4])
+                (f/take-largest 2)) => [5 4])
 
       (fact "returns largest vecs"
             (-> (f/parallelize c [[1 2] [3 4 5]])
