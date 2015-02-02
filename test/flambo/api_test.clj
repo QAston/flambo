@@ -307,12 +307,12 @@
             (f/reduce +)) => 15)
 
       (fact
-        "fold will not reorder elements inside partition, but can reorder partitions"
+        "fold-left will not reorder elements inside partition, but can reorder partitions"
         (-> (f/parallelize c [1 2 3 4 5], 2)
-            (f/fold [] conj)) => (just [[3 4 5] [1 2]] :in-any-order))
+            (f/fold-left [] conj)) => (just [[3 4 5] [1 2]] :in-any-order))
 
       (fact
-        "fold is the same as (aggregate r zero-value f f)"
+        "fold-left is the same as (aggregate r zero-value f f)"
         (-> (f/parallelize c [1 2 3 4], 2)
             (f/aggregate [] conj conj)) => (just [[3 4] [1 2]] :in-any-order))
 
@@ -332,13 +332,20 @@
             (f/count-by-key)) => {"key1" 2 "key2" 2 "key3" 1})
 
       (fact
-        "count-by-value returns a hashmap of (V, int) pairs with the count of each value"
+        "count-by-entry returns a hashmap of (V, int) pairs with the count of each value"
         (-> (f/parallelize c [["key1" 11]
                               ["key1" 11]
                               ["key2" 12]
                               ["key2" 12]
                               ["key3" 13]])
-            (f/count-by-value)) => {["key1" 11] 2, ["key2" 12] 2, ["key3" 13] 1})
+            (f/count-by-entry)) => {["key1" 11] 2, ["key2" 12] 2, ["key3" 13] 1})
+
+      (fact
+        "count-by-entry returns a hashmap of (V, int) pairs with the count of each value"
+        (-> (f/parallelize c [["key1" 11]
+                              ["key1" 12]])
+            (f/map-to-pair identity)
+            (f/count-by-entry)) => {(scala.Tuple2. "key1" 11) 1, (scala.Tuple2. "key1" 12) 1})
 
       (fact
         "values returns the values (V) of a hashmap of (K, V) pairs from a JavaRDD"

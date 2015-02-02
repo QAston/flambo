@@ -209,7 +209,7 @@
 ;; Function for transforming RDDs
 ;;
 
-(defn count-by-value
+(defn count-by-entry
   "Return the count of each unique value in `rdd` as a map of (value, count)
   pairs."
   [rdd]
@@ -831,12 +831,6 @@
   "Pass each value in the key-value pair RDD through a flatMap function without changing the keys; this also retains the original RDD's partitioning."
   [rdd f]
   (.flatMapValues (to-java-pair-rdd rdd) (ff/function f)))
-
-(defn collect-as-map
-  "Return the key-value pairs in this RDD to the master as a Map."
-  [rdd]
-  (into {}
-        (.collectAsMap (to-java-pair-rdd rdd))))
 
 (defn collect-as-map
   "Return the key-value pairs in this RDD to the master as a Map."
