@@ -11,7 +11,8 @@
                                      function
                                      function2
                                      pair-function
-                                     void-function]])
+                                     void-function]]
+            [flambo.interop :as fi])
   (:import [org.apache.spark.streaming.api.java JavaStreamingContext JavaDStream]
            [org.apache.spark.streaming.kafka KafkaUtils]
            [org.apache.spark.streaming.flume FlumeUtils]
@@ -65,12 +66,10 @@
     ;; JavaDStream doesn't have a .reduceByKey so cast to JavaPairDStream first
     (-> dstream
       (.mapToPair (pair-function identity))
-      (.reduceByKey (function2 f))
-      (.map (function f/untuple)))
+      (.reduceByKey (function2 f)))
     ;; if it's already JavaPairDStream, we're good
     (-> dstream
-        (.reduceByKey (function2 f))
-        (.map (function f/untuple)))))
+        (.reduceByKey (function2 f)))))
 
 (defn map-to-pair [dstream f]
   (.mapToPair dstream (pair-function f)))
@@ -102,8 +101,7 @@
 (defn group-by-key-and-window [dstream window-length slide-interval]
   (-> dstream
       (.mapToPair (pair-function identity))
-      (.groupByKeyAndWindow (duration window-length) (duration slide-interval))
-      (.map (function f/untuple))))
+      (.groupByKeyAndWindow (duration window-length) (duration slide-interval))))
 
 (defn reduce-by-window [dstream f f-inv window-length slide-interval]
   (.reduceByWindow dstream (function2 f) (function2 f-inv) (duration window-length) (duration slide-interval)))
@@ -111,8 +109,7 @@
 (defn reduce-by-key-and-window [dstream f window-length slide-interval]
   (-> dstream
       (.mapToPair (pair-function identity))
-      (.reduceByKeyAndWindow (function2 f) (duration window-length) (duration slide-interval))
-      (.map (function f/untuple))))
+      (.reduceByKeyAndWindow (function2 f) (duration window-length) (duration slide-interval))))
 
 
 ;; ## Actions
