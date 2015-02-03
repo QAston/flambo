@@ -26,6 +26,7 @@
             [flambo.conf :as conf]
             [flambo.utils :as u]
             [flambo.kryo :as k]
+            [flambo.interop :as fi]
             [flambo.kryo :as kryo])
   (:import [scala Tuple2]
            [java.util Comparator]
@@ -147,25 +148,6 @@
   (let [clazz (Class/forName (clojure.string/replace (str ns) #"-" "_"))]
     (JavaSparkContext/jarOfClass clazz)))
 
-(defn untuple [^Tuple2 t]
-  (let [v (transient [])]
-    (conj! v (._1 t))
-    (conj! v (._2 t))
-    (persistent! v)))
-
-(defn double-untuple [^Tuple2 t]
-  (let [[x ^Tuple2 t2] (untuple t)
-        v (transient [])]
-    (conj! v x)
-    (conj! v (untuple t2))
-    (persistent! v)))
-
-(defn group-untuple [^Tuple2 t]
-  (let [v (transient [])]
-    (conj! v (._1 t))
-    (conj! v (into [] (._2 t)))
-    (persistent! v)))
-
 (defn- ftruthy?
   [f]
   (fn [x] (u/truthy? (f x))))
@@ -192,6 +174,11 @@
   "Distributes a local collection to form/return a JavaDoubleRDD"
   ([spark-context lst] (.parallelizeDoubles spark-context (core-map double lst)))
   ([spark-context lst num-slices] (.parallelizeDoubles spark-context (core-map double lst) num-slices)))
+
+(defn parallelize-as-pairs
+  "Distributes a local collection to form/return a JavaPairRDD. Tries to convert to scala tuples."
+  ([spark-context lst] (.parallelizePairs spark-context (core-map fi/to-tuple lst)))
+  ([spark-context lst num-slices] (.parallelizePairs spark-context (core-map fi/to-tuple lst) num-slices)))
 
 (defn partitionwise-sampled-rdd [rdd sampler preserve-partitioning? seed]
   "Creates a PartitionwiseSampledRRD from existing RDD and a sampler object"
@@ -273,19 +260,16 @@
 (defn cartesian
   "Creates the cartesian product of two RDDs returning an RDD of pairs"
   [rdd1 rdd2]
-  (-> (.cartesian rdd1 rdd2)
-      (.map (function untuple))))
+  (-> (.cartesian rdd1 rdd2)))
 
 (defn group-by
   "Returns an RDD of items grouped by the return value of function `f`."
   ([rdd f]
     (-> rdd
-        (.groupBy (function f))
-        (.map (function group-untuple))))
+        (.groupBy (function f))))
   ([rdd f n]
     (-> rdd
-        (.groupBy (function f) n)
-        (.map (function group-untuple)))))
+        (.groupBy (function f) n))))
 
 (defn take-sample
   "Returns a `fraction` sample of `rdd`, with or without replacement,
@@ -635,7 +619,7 @@
 (defmethod histogram false [rdd bucket-count]
   (let [[buckets counts] (-> (to-java-double-rdd rdd)
                              (.histogram bucket-count)
-                             untuple)]
+                             fi/untuple)]
     [(into [] buckets) (into [] counts)]))
 
 (defn mean
@@ -690,21 +674,18 @@
   [rdd f]
   (-> rdd
       (to-java-pair-rdd)
-      (.reduceByKey (function2 f))
-      (.map (function untuple))))
+      (.reduceByKey (function2 f))))
 
 (defn group-by-key
   "Groups the values for each key in `rdd` into a single sequence."
   ([rdd]
     (-> rdd
         (to-java-pair-rdd)
-        .groupByKey
-        (.map (function group-untuple))))
+        .groupByKey))
   ([rdd n]
     (-> rdd
         (to-java-pair-rdd)
-        (.groupByKey n)
-        (.map (function group-untuple)))))
+        (.groupByKey n))))
 
 (defn combine-by-key
   "Combines the elements for each key using a custom set of aggregation functions.
@@ -720,16 +701,14 @@
         (to-java-pair-rdd)
         (.combineByKey (function create-combiner)
                        (function2 merge-value)
-                       (function2 merge-combiners))
-        (.map (function untuple))))
+                       (function2 merge-combiners))))
   ([rdd create-combiner merge-value merge-combiners n]
     (-> rdd
         (to-java-pair-rdd)
         (.combineByKey (function create-combiner)
                        (function2 merge-value)
                        (function2 merge-combiners)
-                       n)
-        (.map (function untuple)))))
+                       n))))
 
 (defn sort-by-key
   "When called on `rdd` of (K, V) pairs where K implements ordered, returns a dataset of
@@ -748,8 +727,7 @@
         (to-java-pair-rdd)
         (.sortByKey
           (ff/comparator compare-fn)
-          (u/truthy? asc?))
-        (.map (function untuple)))))
+          (u/truthy? asc?)))))
 
 (defn join
   "When called on `rdd` of type (K, V) and (K, W), returns a dataset of
@@ -757,8 +735,7 @@
   [rdd other]
   (-> rdd
       (to-java-pair-rdd)
-      (.join (to-java-pair-rdd other))
-      (.map (function double-untuple))))
+      (.join (to-java-pair-rdd other))))
 
 (defn left-outer-join
   "Performs a left outer join of `rdd` and `other`. For each element (K, V)
@@ -767,12 +744,7 @@
   [rdd other]
   (-> rdd
       (to-java-pair-rdd)
-      (.leftOuterJoin (to-java-pair-rdd other))
-      (.map (function
-              (fn [t]
-                  (let [[x t2] (untuple t)
-                        [a b] (untuple t2)]
-                    (vector x [a (.orNull b)])))))))
+      (.leftOuterJoin (to-java-pair-rdd other))))
 
 
 (defn count-by-key

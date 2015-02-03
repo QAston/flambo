@@ -1,7 +1,8 @@
 (ns flambo.api-test
   (:use midje.sweet)
   (:require [flambo.api :as f]
-            [flambo.conf :as conf]))
+            [flambo.conf :as conf]
+            [flambo.interop :as fi]))
 
 (facts
   "about spark-context"
@@ -44,12 +45,12 @@
   (fact
     "untuple returns a 2 vector"
     (let [tuple2 (scala.Tuple2. 1 "hi")]
-      (f/untuple tuple2) => [1 "hi"]))
+      (fi/untuple tuple2) => [1 "hi"]))
 
   (fact
     "double untuple returns a vector with a key and a 2 vector value"
     (let [double-tuple2 (scala.Tuple2. 1 (scala.Tuple2. 2 "hi"))]
-      (f/double-untuple double-tuple2) => [1 [2 "hi"]])))
+      (fi/double-untuple double-tuple2) => [1 [2 "hi"]])))
 
 (facts
   "about transformations"
@@ -113,18 +114,19 @@
         RDD through a pair function"
         (-> (f/parallelize c ["a" "b" "c" "d"])
             (f/map-to-pair (f/fn [x] [x 1]))
-            (f/map f/untuple)
+            (f/map fi/untuple)
             f/collect
             vec) => [["a" 1] ["b" 1] ["c" 1] ["d" 1]])
 
       (fact
         "reduce-by-key returns an RDD of (K, V) when called on an RDD of (K, V) pairs"
-        (-> (f/parallelize c [["key1" 1]
+        (-> (f/parallelize-as-pairs c [["key1" 1]
                               ["key1" 2]
                               ["key2" 3]
                               ["key2" 4]
                               ["key3" 5]])
             (f/reduce-by-key (f/fn [x y] (+ x y)))
+            (f/map fi/untuple)
             f/collect
             vec) => (contains #{["key1" 3] ["key2" 7] ["key3" 5]}))
 
@@ -156,6 +158,7 @@
                                       ["key4" [44]]])
               ]
           (-> (f/join LDATA RDATA)
+              (f/map fi/double-untuple)
               f/collect
               vec)) => (just [["key3" [[5] [33]]]
                               ["key4" [[1] [44]]]
@@ -172,6 +175,7 @@
                                       ["key3" [33]]
                                       ["key4" [44]]])]
           (-> (f/left-outer-join LDATA RDATA)
+              (f/map fi/left-outer-join-untuple)
               f/collect
               vec)) => (just [["key3" [[5] [33]]]
                               ["key4" [[1] [44]]]
@@ -186,6 +190,7 @@
                               ["key2" 1]
                               ["key1" 1]])
             (f/combine-by-key identity + +)
+            (f/map fi/untuple)
             f/collect
             vec) => (just [["key1" 2] ["key2" 1]] :in-any-order))
 
@@ -196,6 +201,7 @@
                               [3 "cc"]
                               [1 "dd"]])
             (f/sort-by-key compare false)
+            (f/map fi/untuple)
             f/collect
             vec) => [[5 "bb"] [3 "cc"] [2 "aa"] [1 "dd"]])
 
@@ -221,6 +227,7 @@
         "group-by returns an RDD of items grouped by the grouping function"
         (-> (f/parallelize c [1 1 2 3 5 8])
             (f/group-by (f/fn [x] (mod x 2)))
+            (f/map fi/group-untuple)
             f/collect
             vec) => (just [[0 [2 8]] [1 [1 1 3 5]]] :in-any-order))
 
@@ -232,6 +239,7 @@
                               ["key2" 4]
                               ["key3" 5]])
             f/group-by-key
+            (f/map fi/group-untuple)
             f/collect
             vec) => (just [["key3" [5]] ["key1" [1 2]] ["key2" [3 4]]] :in-any-order))
 
@@ -241,7 +249,7 @@
                               ["years ago"]])
             (f/flat-map-to-pair (f/fn [x] (map (fn [y] [y 1])
                                                (clojure.string/split (first x) #" "))))
-            (f/map f/untuple)
+            (f/map fi/untuple)
             f/collect
             vec) => [["Four" 1] ["score" 1] ["and" 1] ["seven" 1] ["years" 1] ["ago" 1]])
 
@@ -271,6 +279,7 @@
         (let [rdd1 (f/parallelize c [1 2])
               rdd2 (f/parallelize c [5 6 7])]
           (-> (f/cartesian rdd1 rdd2)
+              (f/map fi/untuple)
               f/collect
               vec) => (just [[1 5] [1 6] [1 7] [2 5] [2 6] [2 7]] :in-any-order)))
 
@@ -338,7 +347,8 @@
                               ["key2" 12]
                               ["key2" 12]
                               ["key3" 13]])
-            (f/count-by-entry)) => {["key1" 11] 2, ["key2" 12] 2, ["key3" 13] 1})
+            (f/count-by-entry)
+            ) => {["key1" 11] 2, ["key2" 12] 2, ["key3" 13] 1})
 
       (fact
         "count-by-entry returns a hashmap of (V, int) pairs with the count of each value"

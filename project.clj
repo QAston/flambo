@@ -1,10 +1,12 @@
-(defproject com.tangramcare/flambo "0.4.0-SNAPSHOT"
+(defproject com.tangramcare/flambo "0.4.1-SNAPSHOT"
   :description "A Clojure DSL for Apache Spark"
   :url "http://git.itx.pl/o2/flambofork/"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/tools.logging "0.2.6"]
+                 [clj-tuple "0.2.0"]
+                 [t6/from-scala "0.2.0"]
                  [com.tangramcare/serializable-fn "0.0.6-SNAPSHOT"
                   :exclusions [com.twitter/chill-java]]
                  [com.twitter/carbonite "1.4.0"
