@@ -1,10 +1,15 @@
 (ns flambo.function
-  (:refer-clojure :exclude [comparator])
+  (:refer-clojure :exclude [comparator fn])
   (:require [serializable.fn :as sfn]
             [flambo.utils :as u]
             [flambo.kryo :as kryo]
             [clojure.tools.logging :as log])
-  (:import [scala Tuple2]))
+  (:import [scala Tuple2]
+           (flambo.function ScalaFunction0 ScalaFunction1)))
+
+(defmacro fn
+  [& body]
+  `(sfn/fn ~@body))
 
 (defn- serfn? [f]
   (= (type f) :serializable.fn/serializable-fn))
@@ -35,7 +40,7 @@
   [fmt sym-name]
   (symbol (format fmt sym-name)))
 
-(defmacro gen-function
+(defmacro gen-function+class
   [clazz wrapper-name fn-symbol implemented-type]
     (let [new-class-sym (mk-sym "flambo.function.%s" clazz)
           prefix-sym (mk-sym "%s-" clazz)]
@@ -56,9 +61,14 @@
 
 (defmacro gen-spark-api-function
   [clazz wrapper-name]
-    `(gen-function ~clazz ~wrapper-name ~(mk-sym "%s-call" clazz) ~(mk-sym "org.apache.spark.api.java.function.%s" clazz)))
+    `(gen-function+class ~clazz ~wrapper-name ~(mk-sym "%s-call" clazz) ~(mk-sym "org.apache.spark.api.java.function.%s" clazz)))
+#_(defmacro gen-spark-api-function
+  [clazz wrapper-name]
 
-(gen-function Comparator comparator Comparator-compare java.util.Comparator)
+  `(defn ~wrapper-name [f#]
+     (new ~(symbol (str "flambo.function.Flambo" clazz)) f#)))
+
+(gen-function+class Comparator comparator Comparator-compare java.util.Comparator)
 ;
 (gen-spark-api-function Function function)
 (gen-spark-api-function Function2 function2)
@@ -87,3 +97,12 @@
 
 (defn DoubleFlatMapFunction-call [this x]
   (map double (-call this x)))
+
+(defmacro gen-function
+  [clazz wrapper-name]
+
+  `(defn ~wrapper-name [f#]
+     (new ~(symbol (str "flambo.function." clazz)) f#)))
+
+(gen-function ScalaFunction0 scala-function0)
+(gen-function ScalaFunction1 scala-function1)

@@ -1,6 +1,6 @@
 (ns flambo.interop
   (:refer-clojure :exclude [first second seq vec fn])
-  (:require [serializable.fn :refer [fn]])
+  (:require [flambo.function :refer [fn]])
   (:import [scala Tuple1 Tuple2 Tuple3 Tuple4 Tuple5 Tuple6 Tuple7 Tuple8 Tuple9 Tuple10 Tuple11 Tuple12 Tuple13 Tuple14 Tuple15 Tuple16 Tuple17 Tuple18 Tuple19 Tuple20 Tuple21 Tuple22 Some]
            [com.google.common.base Optional])
   )
@@ -190,3 +190,9 @@
   (let [[x t2] (untuple t)
         [a b] (untuple t2)]
     (vector x [a (.orNull b)])))
+
+(defn seq-value [[k v]]
+  [k (seq v)])
+
+(defn untuple-value [[k v]]
+  [k (untuple v)])

@@ -23,7 +23,7 @@
         (-> (f/parallelize c [1 2 3 4 5]) f/collect vec) => (just [1 2 3 4 5]))
       )))
 
-(facts
+#_(facts
   "about serializable functions"
 
   (let [myfn (f/fn [x] (* 2 x))]

@@ -15,7 +15,6 @@
             [flambo.interop :as fi])
   (:import [org.apache.spark.streaming.api.java JavaStreamingContext JavaDStream]
            [org.apache.spark.streaming.kafka KafkaUtils]
-           [org.apache.spark.streaming.flume FlumeUtils]
            [org.apache.spark.streaming Duration Time]))
 
 (defn duration [ms]
@@ -47,12 +46,6 @@
 
 (defn kafka-stream [& {:keys [streaming-context zk-connect group-id topic-map]}]
   (KafkaUtils/createStream streaming-context zk-connect group-id (into {} (for [[k, v] topic-map] [k (Integer. v)]))))
-
-(defn flume-stream [streaming-context host port]
-  (FlumeUtils/createStream streaming-context host port))
-
-(defn flume-polling-stream [streaming-context host port]
-  (FlumeUtils/createPollingStream streaming-context host port))
 
 (defn flat-map [dstream f]
   (.flatMap dstream (flat-map-function f)))

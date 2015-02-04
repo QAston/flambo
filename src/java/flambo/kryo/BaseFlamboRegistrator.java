@@ -4,34 +4,29 @@ import clojure.lang.IFn;
 import com.esotericsoftware.kryo.Kryo;
 import org.apache.spark.serializer.KryoRegistrator;
 import carbonite.JavaBridge;
+import org.objenesis.strategy.StdInstantiatorStrategy;
 import scala.Tuple2;
 import com.twitter.chill.Tuple2Serializer;
 import clojure.java.api.Clojure;
 
 public class BaseFlamboRegistrator implements KryoRegistrator {
 
-  static {
-    IFn require = Clojure.var("clojure.core", "require");
-    require.invoke(Clojure.read("flambo.kryo.sfn-serializer"));
-  }
-  protected void register(Kryo kryo) {
-  }
+    static {
+        Utils.requireNamespace("flambo.kryo.sfn-serializer");
+    }
 
-  @Override
-  public final void registerClasses(Kryo kryo) {
-    try {
-      JavaBridge.enhanceRegistry(kryo);
-      kryo.register(Tuple2.class, new Tuple2Serializer());
-      IFn register = Clojure.var("flambo.kryo.sfn-serializer", "register");
-      register.invoke(kryo);
+    protected void register(Kryo kryo) {
+    }
 
-      // we have to reflect this scala class since it's private wheeee
-      // and grouping returns these, will be fixed in spark 1.0.1
-
-      // Class cls = Class.forName("scala.collection.convert.Wrappers$IterableWrapper");
-      // kryo.register(cls, new JavaIterableWrapperSerializer());
-
-      register(kryo);
+    @Override
+    public final void registerClasses(Kryo kryo) {
+        try {
+            JavaBridge.enhanceRegistry(kryo);
+            kryo.register(Tuple2.class, new Tuple2Serializer());
+            IFn register = Clojure.var("flambo.kryo.sfn-serializer", "register");
+            register.invoke(kryo);
+            //kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
+            register(kryo);
 
       /*
         We do this because under mesos these serializers don't get registered
@@ -40,14 +35,14 @@ public class BaseFlamboRegistrator implements KryoRegistrator {
         problem.
       */
 
-      // kryo.register(scala.collection.convert.Wrappers.IteratorWrapper.class);
-      // kryo.register(scala.collection.convert.Wrappers.SeqWrapper.class);
-      // kryo.register(scala.collection.convert.Wrappers.MapWrapper.class);
-      // kryo.register(scala.collection.convert.Wrappers.JListWrapper.class);
-      // kryo.register(scala.collection.convert.Wrappers.JMapWrapper.class);
+            // kryo.register(scala.collection.convert.Wrappers.IteratorWrapper.class);
+            // kryo.register(scala.collection.convert.Wrappers.SeqWrapper.class);
+            // kryo.register(scala.collection.convert.Wrappers.MapWrapper.class);
+            // kryo.register(scala.collection.convert.Wrappers.JListWrapper.class);
+            // kryo.register(scala.collection.convert.Wrappers.JMapWrapper.class);
 
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to register kryo!", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to register kryo!", e);
+        }
     }
-  }
 }
