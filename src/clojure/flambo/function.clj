@@ -62,6 +62,7 @@
 (defmacro gen-spark-api-function
   [clazz wrapper-name]
     `(gen-function+class ~clazz ~wrapper-name ~(mk-sym "%s-call" clazz) ~(mk-sym "org.apache.spark.api.java.function.%s" clazz)))
+
 #_(defmacro gen-spark-api-function
   [clazz wrapper-name]
 

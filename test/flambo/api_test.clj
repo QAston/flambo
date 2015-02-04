@@ -217,6 +217,17 @@
             vec) => [[2 "aa"] [5 "bb"] [3 "cc"] [1 "dd"]])
 
       (fact
+        "sort-by works also on pair rdds"
+        (-> (f/parallelize-as-pairs c [[2 "aa"]
+                              [5 "bb"]
+                              [3 "cc"]
+                              [1 "dd"]])
+            (f/sort-by (f/fn [x] (fi/second x)) true)
+            (f/map fi/untuple)
+            f/collect
+            vec) => [[2 "aa"] [5 "bb"] [3 "cc"] [1 "dd"]])
+
+      (fact
         "coalesce"
         (-> (f/parallelize c [1 2 3 4 5])
             (f/coalesce 1)

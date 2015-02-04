@@ -225,14 +225,6 @@
   ([spark-context lst] (.parallelizePairs spark-context lst))
   ([spark-context lst num-slices] (.parallelizePairs spark-context lst num-slices)))
 
-;(defn union
-;  "Build the union of two or more RDDs"
-;  ([rdd1 rdd2]
-;    (.union rdd1 rdd2))
-;  ([rdd1 rdd2 & rdds]
-;    (.union (JavaSparkContext/fromSparkContext (.context rdd1)) rdd1 (ArrayList. (conj rdds rdd2)))))
-
-
 (defn partitioner-aware-union [pair-rdd1 pair-rdd2 & pair-rdds]
   ;; TODO: add check to make sure every rdd is a pair-rdd and has the same partitioner.
   (JavaPairRDD/fromRDD
@@ -508,6 +500,19 @@
   [rdd]
   (.size (.partitions rdd)))
 
+
+(def zip
+  "Zips this RDD with another one, returning PairRDD with the first element in each RDD, second element in each RDD, etc."
+  (memfn zip))
+
+(def zip-with-ndex
+  "Zips this RDD with its element indices, returning PairRDD"
+  (memfn zipWithIndex))
+
+(def zip-with-unique-id
+  "Zips this RDD with generated unique Long ids, returning PairRDD"
+  (memfn zipWithUniqueId))
+
 ;;
 
 (defprotocol PHasContext
@@ -569,6 +574,22 @@
     (if (= (.classTag this) k/TUPLE-CLASS-TAG)
       (JavaPairRDD/fromRDD (.rdd this) k/FAKE-CLASS-TAG k/FAKE-CLASS-TAG)
       (map-to-pair this identity))))
+
+
+(defprotocol PConvertibleToJavaRDD
+  "Types convertible to JavaRDD"
+  (^JavaRDD to-java-rdd [this]))
+
+(extend-type JavaRDD
+  PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    this))
+
+(extend-type JavaRDDLike
+  PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    (JavaRDD/fromRDD (.rdd this) (.classTag this))
+    ))
 
 ;; JavaRDD common API
 
@@ -698,18 +719,18 @@
   seed (optional) - random seed
   returns: split RDDs in an array"
   ([rdd weights]
-    (vec (.randomSplit rdd (double-array weights))))
+    (vec (.randomSplit (to-java-rdd rdd) (double-array weights))))
   ([rdd weights seed]
-    (vec (.randomSplit rdd (double-array weights) (long seed)))))
+    (vec (.randomSplit (to-java-rdd rdd) (double-array weights) (long seed)))))
 
 (defn sort-by
   "Return this RDD sorted by the given key function."
   ([rdd f]
-    (.sortBy rdd (function f) true (num-partitions rdd)))
+    (.sortBy (to-java-rdd rdd) (function f) true (num-partitions rdd)))
   ([rdd f ascending?]
-    (.sortBy rdd (function f) ascending? (num-partitions rdd)))
+    (.sortBy (to-java-rdd rdd) (function f) ascending? (num-partitions rdd)))
   ([rdd f ascending? num-partitions]
-    (.sortBy rdd (function f) ascending? num-partitions)))
+    (.sortBy (to-java-rdd rdd) (function f) ascending? num-partitions)))
 
 ; JavaDoubleRDD API
 

@@ -78,7 +78,7 @@
             :min-lein-version "2.5.0")
 
 ;; test with
-;;     lein do clean, test
+;;     lein do clean, with-profile +test midje
 
 ;; run example with
 ;;     lein with-profile example,provided run
