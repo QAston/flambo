@@ -1,11 +1,11 @@
-package flambo.function;
+package flambo.aotfna;
 
 import clojure.lang.AFunction;
-import flambo.kryo.AbstractSerializableWrappedAFunction;
 import org.apache.spark.api.java.function.PairFlatMapFunction;
 import scala.Tuple2;
+import flambo.serialize.*;
 
-public class FlamboPairFlatMapFunction extends AbstractSerializableWrappedAFunction implements PairFlatMapFunction {
+public class FlamboPairFlatMapFunction extends AbstractSerializableWrappedAFunctionAot implements PairFlatMapFunction {
     public FlamboPairFlatMapFunction(AFunction func) {
         super(func);
     }

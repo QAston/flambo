@@ -1,10 +1,10 @@
-package flambo.function;
+package flambo.aotfna;
 
 import clojure.lang.AFunction;
-import flambo.kryo.AbstractSerializableWrappedAFunction;
 import org.apache.spark.api.java.function.Function3;
+import flambo.serialize.*;
 
-public class FlamboFunction3 extends AbstractSerializableWrappedAFunction implements Function3 {
+public class FlamboFunction3 extends AbstractSerializableWrappedAFunctionAot implements Function3 {
     public FlamboFunction3(AFunction func) {
         super(func);
     }

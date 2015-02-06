@@ -1,10 +1,9 @@
-package flambo.kryo;
+package flambo.serialize;
 
 import clojure.lang.IFn;
 import com.esotericsoftware.kryo.Kryo;
 import org.apache.spark.serializer.KryoRegistrator;
 import carbonite.JavaBridge;
-import org.objenesis.strategy.StdInstantiatorStrategy;
 import scala.Tuple2;
 import com.twitter.chill.Tuple2Serializer;
 import clojure.java.api.Clojure;

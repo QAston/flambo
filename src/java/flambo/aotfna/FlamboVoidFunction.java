@@ -1,10 +1,10 @@
-package flambo.function;
+package flambo.aotfna;
 
 import clojure.lang.AFunction;
-import flambo.kryo.AbstractSerializableWrappedAFunction;
+import flambo.serialize.*;
 import org.apache.spark.api.java.function.VoidFunction;
 
-public class FlamboVoidFunction extends AbstractSerializableWrappedAFunction implements VoidFunction{
+public class FlamboVoidFunction extends AbstractSerializableWrappedAFunctionAot implements VoidFunction{
   
   @SuppressWarnings("unchecked")
   public void call(Object v1) throws Exception {

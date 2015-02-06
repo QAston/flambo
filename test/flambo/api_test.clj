@@ -121,10 +121,10 @@
       (fact
         "reduce-by-key returns an RDD of (K, V) when called on an RDD of (K, V) pairs"
         (-> (f/parallelize-as-pairs c [["key1" 1]
-                              ["key1" 2]
-                              ["key2" 3]
-                              ["key2" 4]
-                              ["key3" 5]])
+                                       ["key1" 2]
+                                       ["key2" 3]
+                                       ["key2" 4]
+                                       ["key3" 5]])
             (f/reduce-by-key (f/fn [x y] (+ x y)))
             (f/map fi/untuple)
             f/collect
@@ -218,14 +218,16 @@
 
       (fact
         "sort-by works also on pair rdds"
-        (-> (f/parallelize-as-pairs c [[2 "aa"]
-                              [5 "bb"]
-                              [3 "cc"]
-                              [1 "dd"]])
-            (f/sort-by (f/fn [x] (fi/second x)) true)
-            (f/map fi/untuple)
-            f/collect
-            vec) => [[2 "aa"] [5 "bb"] [3 "cc"] [1 "dd"]])
+        (try (-> (f/parallelize-as-pairs c [[2 "aa"]
+                                            [5 "bb"]
+                                            [3 "cc"]
+                                            [1 "dd"]])
+                 (f/sort-by (f/fn [x] (fi/second x)) true)
+                 (f/map fi/untuple)
+                 f/collect
+                 vec)
+             (catch Exception ex
+               (clojure.stacktrace/print-stack-trace (.getCause ex)))) => [[2 "aa"] [5 "bb"] [3 "cc"] [1 "dd"]])
 
       (fact
         "coalesce"
@@ -393,8 +395,10 @@
 
       (fact
         "foreach runs a function on each element of the RDD, returns nil; this is usually done for side effcts"
-        (-> (f/parallelize c [1 2 3 4 5])
-            (f/foreach (f/fn [x] x))) => nil)
+        (try (-> (f/parallelize c [1 2 3 4 5])
+                 (f/foreach (f/fn [x] x)))
+             (catch Exception ex
+               (clojure.stacktrace/print-stack-trace (.getCause ex)))) => nil)
 
       (fact
         "foreach-partition runs a function on each partition iterator of RDD; basically for side effects like foreach"

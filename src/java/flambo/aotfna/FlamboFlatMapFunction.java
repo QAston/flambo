@@ -1,10 +1,10 @@
-package flambo.function;
+package flambo.aotfna;
 
 import clojure.lang.AFunction;
-import flambo.kryo.AbstractSerializableWrappedAFunction;
 import org.apache.spark.api.java.function.FlatMapFunction;
+import flambo.serialize.*;
 
-public class FlamboFlatMapFunction extends AbstractSerializableWrappedAFunction implements FlatMapFunction {
+public class FlamboFlatMapFunction extends AbstractSerializableWrappedAFunctionAot implements FlatMapFunction {
 
     public FlamboFlatMapFunction(AFunction func) {
         super(func);

@@ -1,4 +1,4 @@
-(defproject com.tangramcare/flambo "0.5.0-SNAPSHOT"
+(defproject com.tangramcare/flambo "0.5.1-SNAPSHOT"
             :description "A Clojure DSL for Apache Spark"
             :url "http://git.itx.pl/o2/flambofork/"
             :license {:name "Eclipse Public License"

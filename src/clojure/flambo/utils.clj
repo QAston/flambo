@@ -3,7 +3,6 @@
   (:import [scala Tuple2]
            [org.apache.spark.util.random BernoulliCellSampler XORShiftRandom]
            [java.io PrintStream]
-           [flambo WriterOutputStream]
            [org.apache.log4j Logger WriterAppender SimpleLayout]))
 
 (defn echo-types [c]

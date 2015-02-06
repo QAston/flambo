@@ -1,10 +1,10 @@
-package flambo.function;
+package flambo.aotfna;
 
 import clojure.lang.AFunction;
-import flambo.kryo.AbstractSerializableWrappedAFunction;
 import org.apache.spark.api.java.function.DoubleFunction;
+import flambo.serialize.*;
 
-public class FlamboDoubleFunction extends AbstractSerializableWrappedAFunction implements DoubleFunction {
+public class FlamboDoubleFunction extends AbstractSerializableWrappedAFunctionAot implements DoubleFunction {
     public FlamboDoubleFunction(AFunction func) {
         super(func);
     }

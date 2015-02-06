@@ -1,7 +1,7 @@
-package flambo.function;
+package flambo.aotfna;
 
 import clojure.lang.AFunction;
-import flambo.kryo.Utils;
+import flambo.serialize.Utils;
 import scala.Function1;
 import scala.runtime.AbstractFunction1;
 
@@ -21,11 +21,11 @@ public class ScalaFunction1 extends AbstractFunction1 implements Function1, Seri
   }
 
   private void writeObject(ObjectOutputStream out) throws IOException {
-    Utils.writeAFunction(out, f);
+    Utils.writeAotFunction(out, f);
   }
   
   private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-    f = Utils.readAFunction(in);
+    f = Utils.readAotFunction(in);
   }
 
     @Override

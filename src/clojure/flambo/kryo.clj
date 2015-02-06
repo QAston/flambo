@@ -34,6 +34,22 @@
         ^SerializerInstance ser (.. (SparkEnv/get) serializer newInstance)]
     (.deserialize ser buf OBJECT-CLASS-TAG)))
 
+(defn ^bytes serialize-closure
+  "We piggy back off of spark's kryo instance from `SparkEnv` since it already
+  has all of our custom serializers and other things we need to serialize our functions."
+  [^Object obj]
+  (let [^SerializerInstance ser (.. (SparkEnv/get) closureSerializer newInstance)
+        ^ByteBuffer buf (.serialize ser obj OBJECT-CLASS-TAG)]
+    (.array buf)))
+
+(defn deserialize-closure
+  "We piggy back off of spark's kryo instance from `SparkEnv` for the same
+  reasons we do so in `serialize`."
+  [^bytes b]
+  (let [^ByteBuffer buf (ByteBuffer/wrap b)
+        ^SerializerInstance ser (.. (SparkEnv/get) closureSerializer newInstance)]
+    (.deserialize ser buf OBJECT-CLASS-TAG)))
+
 (defmacro defregistrator
   "A macro for creating a custom kryo registrator for application that need to
   register custom kryo serializers.

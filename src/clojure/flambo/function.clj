@@ -5,7 +5,7 @@
             [flambo.kryo :as kryo]
             [clojure.tools.logging :as log])
   (:import [scala Tuple2]
-           (flambo.function ScalaFunction0 ScalaFunction1)))
+           (java.io ObjectOutputStream ObjectInputStream)))
 
 (defmacro fn
   [& body]
@@ -18,58 +18,95 @@
 (def deserialize-fn (memoize sfn/deserialize))
 (def array-of-bytes-type (Class/forName "[B"))
 
-;; ## Generic
-(defn -init
-  "Save the function f in state"
-  [f]
-  [[] f])
-
-(defn -call [this & xs]
-  (let [fn-or-serfn (.state this)
-        f (if (instance? array-of-bytes-type fn-or-serfn)
-            (binding [sfn/*deserialize* kryo/deserialize]
-              (deserialize-fn fn-or-serfn))
-            fn-or-serfn)]
-    (log/trace "CLASS" (type this))
-    (log/trace "META" (meta f))
-    (log/trace "XS" xs)
-    (apply f xs)))
-
 ;; ## Functions
 (defn mk-sym
   [fmt sym-name]
   (symbol (format fmt sym-name)))
 
-(defmacro gen-function+class
-  [clazz wrapper-name fn-symbol implemented-type]
-    (let [new-class-sym (mk-sym "flambo.function.%s" clazz)
-          prefix-sym (mk-sym "%s-" clazz)]
-      `(do
-         (def ~(mk-sym "%s-init" clazz) -init)
-         (def ~fn-symbol -call)
-         (gen-class
-           :name ~new-class-sym
-           :implements [~implemented-type java.io.Serializable]
-           :prefix ~prefix-sym
-           :init ~'init
-           :state ~'state
-           :constructors {[Object] []})
-         (defn ~wrapper-name [f#]
-           (new ~new-class-sym
-                (if (serfn? f#) (binding [sfn/*serialize* kryo/serialize]
-                                  (serialize-fn f#)) f#))))))
+(defn write-to-output-stream [^clojure.lang.AFunction$1 afn ^ObjectOutputStream out]
+  (let [b (binding [sfn/*serialize* kryo/serialize]
+            (serialize-fn afn))]
+    (.writeInt out (alength b))
+    (.write out ^bytes b)))
+
+(defn ^clojure.lang.AFunction$1 read-from-input-stream [^ObjectInputStream in]
+  (let [b (byte-array (.readInt in))
+        _ (.read in b)]
+    (binding [sfn/*deserialize* kryo/deserialize]
+      (deserialize-fn b))))
+
+
+(defn -jit-init
+  [f]
+  [[f]])
+
+(defn -jit-call [this & xs]
+  (apply ^clojure.lang.AFunction$1 (.f this) xs))
+
+(defmacro gen-jit-function-class
+  [clazz method-symbol base-class interface]
+  (let [new-class-sym (mk-sym "flambo.jitfn.%s" clazz)
+        prefix-sym (mk-sym "%s-jit-" clazz)]
+    `(do
+       (def ~(mk-sym "%s-jit-init" clazz) -jit-init)
+       (def ~(mk-sym (str "%s-jit-" method-symbol) clazz) -jit-call)
+       (gen-class
+         :name ~new-class-sym
+         :implements [java.io.Serializable ~interface]
+         :extends ~base-class
+         :prefix ~prefix-sym
+         :init ~'init
+         :constructors ~'{[Object] [Object]}
+         :exposes ~'{f {:get f}})
+       )))
+
+(defn -aot-init
+  [f]
+  [[f]])
+
+(defn -aot-call [this & xs]
+  (apply ^clojure.lang.AFunction (.f this) xs))
+
+(defmacro gen-aot-function-class
+  [clazz method-symbol base-class interface]
+  (let [new-class-sym (mk-sym "flambo.aotfn.%s" clazz)
+        prefix-sym (mk-sym "%s-aot-" clazz)]
+    `(do
+       (def ~(mk-sym "%s-aot-init" clazz) -aot-init)
+       (def ~(mk-sym (str "%s-aot-" method-symbol) clazz) -aot-call)
+       (gen-class
+         :name ~new-class-sym
+         :implements [java.io.Serializable ~interface]
+         :extends ~base-class
+         :prefix ~prefix-sym
+         :init ~'init
+         :constructors ~'{[clojure.lang.AFunction] [clojure.lang.AFunction]}
+         :exposes ~'{f {:get f}})
+       )))
+
+(defmacro gen-jit-aot-call-wrappers
+  [clazz wrapper-name method-name interface]
+  `(do
+     (gen-jit-function-class ~clazz ~method-name ~'flambo.serialize.AbstractSerializableWrappedAFunctionJit ~interface)
+     (gen-aot-function-class ~clazz ~method-name ~'flambo.serialize.AbstractSerializableWrappedAFunctionAot ~interface)
+     (defn ~wrapper-name
+       [f#]
+       (if (serfn? f#)
+         (~(mk-sym "flambo.jitfn.%s." clazz) f#)
+         (~(mk-sym "flambo.aotfn.%s." clazz) f#)))))
 
 (defmacro gen-spark-api-function
   [clazz wrapper-name]
-    `(gen-function+class ~clazz ~wrapper-name ~(mk-sym "%s-call" clazz) ~(mk-sym "org.apache.spark.api.java.function.%s" clazz)))
+  `(do
+     (gen-jit-function-class ~(symbol (str "Flambo" clazz)) ~'call ~'flambo.serialize.AbstractSerializableWrappedAFunctionJit ~(mk-sym "org.apache.spark.api.java.function.%s" clazz))
+     (gen-aot-function-class ~(symbol (str "Flambo" clazz)) ~'call ~'flambo.serialize.AbstractSerializableWrappedAFunctionAot ~(mk-sym "org.apache.spark.api.java.function.%s" clazz))
+     (defn ~wrapper-name
+       [f#]
+       (if (serfn? f#)
+         (~(mk-sym "flambo.jitfn.Flambo%s." clazz) f#)
+         (~(mk-sym "flambo.aotfn.Flambo%s." clazz) f#)))))
 
-#_(defmacro gen-spark-api-function
-  [clazz wrapper-name]
-
-  `(defn ~wrapper-name [f#]
-     (new ~(symbol (str "flambo.function.Flambo" clazz)) f#)))
-
-(gen-function+class Comparator comparator Comparator-compare java.util.Comparator)
+(gen-jit-aot-call-wrappers Comparator comparator compare java.util.Comparator)
 ;
 (gen-spark-api-function Function function)
 (gen-spark-api-function Function2 function2)
@@ -79,31 +116,49 @@
 (gen-spark-api-function FlatMapFunction2 flat-map-function2)
 (gen-spark-api-function PairFlatMapFunction pair-flat-map-function)
 (gen-spark-api-function PairFunction pair-function)
-(gen-spark-api-function DoubleFlatMapFunction double-flat-map-function) ; A function that takes T, returns zero or more records of type Double from each input record.
-(gen-spark-api-function DoubleFunction double-function)     ; A function that takes T, returns Doubles, and can be used to construct DoubleRDDs.
+(gen-spark-api-function DoubleFlatMapFunction double-flat-map-function)
+(gen-spark-api-function DoubleFunction double-function)
 
 ;; Replaces the PairFunction-call and PairFlatMapFunction-call defined by the gen-function macro.
-(defn PairFunction-call [this x]
-  (let [[a b] (-call this x)]
+(defn FlamboPairFunction-jit-call [this x]
+  (let [[a b] (-jit-call this x)]
     (Tuple2. a b)))
 
-(defn PairFlatMapFunction-call [this x]
-  (let [ret (-call this x)]
+(defn FlamboPairFlatMapFunction-jit-call [this x]
+  (let [ret (-jit-call this x)]
     (for [v ret
           :let [[a b] v]]
       (Tuple2. a b))))
 
-(defn DoubleFunction-call [this x]
-  (double (-call this x)))
+(defn FlamboDoubleFunction-jit-call [this x]
+  (double (-jit-call this x)))
 
-(defn DoubleFlatMapFunction-call [this x]
-  (map double (-call this x)))
+(defn FlamboDoubleFlatMapFunction-jit-call [this x]
+  (map double (-jit-call this x)))
 
-(defmacro gen-function
+
+;; Replaces the PairFunction-call and PairFlatMapFunction-call defined by the gen-function macro.
+(defn FlamboPairFunction-aot-call [this x]
+  (let [[a b] (-aot-call this x)]
+    (Tuple2. a b)))
+
+(defn FlamboPairFlatMapFunction-aot-call [this x]
+  (let [ret (-aot-call this x)]
+    (for [v ret
+          :let [[a b] v]]
+      (Tuple2. a b))))
+
+(defn FlamboDoubleFunction-aot-call [this x]
+  (double (-aot-call this x)))
+
+(defn FlamboDoubleFlatMapFunction-aot-call [this x]
+  (map double (-aot-call this x)))
+
+(defmacro gen-scala-function
   [clazz wrapper-name]
 
   `(defn ~wrapper-name [f#]
-     (new ~(symbol (str "flambo.function." clazz)) f#)))
+     (new ~(symbol (str "flambo.aotfna." clazz)) f#)))
 
-(gen-function ScalaFunction0 scala-function0)
-(gen-function ScalaFunction1 scala-function1)
+(gen-scala-function ScalaFunction0 scala-function0)
+(gen-scala-function ScalaFunction1 scala-function1)

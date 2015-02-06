@@ -48,7 +48,7 @@
 ;; flambo WILL NOT WORK without enabling kryo serialization in spark!
 ;;
 (System/setProperty "spark.serializer" "org.apache.spark.serializer.KryoSerializer")
-(System/setProperty "spark.kryo.registrator" "flambo.kryo.BaseFlamboRegistrator")
+(System/setProperty "spark.kryo.registrator" "flambo.serialize.BaseFlamboRegistrator")
 
 (def STORAGE-LEVELS {:memory-only           StorageLevels/MEMORY_ONLY
                      :memory-only-ser       StorageLevels/MEMORY_ONLY_SER
@@ -937,7 +937,7 @@
   (.partitionBy rdd partitioner))
 
 (defn lookup
-  "Return the list of values in the RDD for key key."
+  "Return the list of values in the RDD for key."
   [rdd key]
   (.lookup (to-java-pair-rdd rdd) key))
 
@@ -954,3 +954,8 @@
                           (iterator-seq iterator)))
     :preserves-partitioning true
     ))
+
+;; ColsRDD specific API
+
+;TODO: impl some ops for cols rdd
+;TODO: map-to-cols, flat-map-to-cols, use-cols-indexes, use-cols-idxfns
