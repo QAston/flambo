@@ -64,7 +64,7 @@
 (extend-type SQLContext
   PHasSQLContext
   (^JavaSQLContext get-java-sql-context [this]
-    (JavaSQLContext. (.sqlContext this))))
+    (JavaSQLContext. this)))
 
 (extend-type SchemaRDD
   PHasSQLContext
@@ -74,7 +74,7 @@
 (extend-type JavaSchemaRDD
   PHasSQLContext
   (^JavaSQLContext get-java-sql-context [this]
-    (get-java-sql-context this)))
+    (get-java-sql-context (.schemaRDD this))))
 
 (def print-schema (memfn printSchema))
 
