@@ -1,4 +1,5 @@
 (ns flambo.mllib
+  (:require [flambo.api :as f])
   (:import (org.apache.spark.mllib.linalg.distributed CoordinateMatrix RowMatrix))
   (:refer-clojure :exclude [vec])
   (:import (org.apache.spark.mllib.linalg Vector Vectors Matrices Matrix)
@@ -53,9 +54,9 @@
   Since each row is represented by a local vector, the number of columns is limited
   by the integer range but it should be much smaller in practice."
   ([row-vector-rdd num-rows num-cols]
-    (RowMatrix. row-vector-rdd num-rows num-cols))
+    (RowMatrix. (f/to-scala-rdd row-vector-rdd) num-rows num-cols))
   ([row-vector-rdd]
-    (RowMatrix. row-vector-rdd)
+    (RowMatrix. (f/to-scala-rdd row-vector-rdd))
     ))
 
 (defn indexed-row-matrix
@@ -63,10 +64,10 @@
   It is backed by an RDD of indexed rows,
   so that each row is represented by its index (long-typed) and a local vector."
   ([indexed-row-rdd num-rows num-cols]
-    (IndexedRowMatrix. indexed-row-rdd num-rows num-cols))
+    (IndexedRowMatrix. (f/to-scala-rdd indexed-row-rdd) num-rows num-cols))
   ([indexed-row-rdd]
-    (IndexedRowMatrix. indexed-row-rdd)
-    ))
+    (IndexedRowMatrix. (f/to-scala-rdd indexed-row-rdd)
+    )))
 
 (defn indexed-row
   "Entry for indexed-row-matrix rdd"
@@ -85,9 +86,9 @@
   A CoordinateMatrix should be used only when both dimensions of the matrix are huge
   and the matrix is very sparse."
   ([entry-rdd num-rows num-cols]
-    (CoordinateMatrix. entry-rdd num-rows num-cols))
+    (CoordinateMatrix. (f/to-scala-rdd entry-rdd) num-rows num-cols))
   ([entry-rdd]
-    (CoordinateMatrix. entry-rdd)
+    (CoordinateMatrix. (f/to-scala-rdd entry-rdd))
     ))
 
 (defn labeled-point
