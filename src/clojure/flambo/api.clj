@@ -30,7 +30,7 @@
            [java.util Comparator]
            [org.apache.spark.api.java JavaSparkContext StorageLevels
                                       JavaRDD JavaDoubleRDD JavaPairRDD JavaFutureAction JavaRDDLike]
-           [org.apache.spark.rdd PartitionwiseSampledRDD]
+           [org.apache.spark.rdd PartitionwiseSampledRDD RDD]
            (org.apache.spark SparkContext)
            [scala Tuple2]
            [java.util Comparator ArrayList]
@@ -528,6 +528,25 @@
   PHasContext
   (^JavaSparkContext get-java-spark-context [this]
     (JavaSparkContext/fromSparkContext (.context this))))
+
+(extend-type JavaSparkContext
+  PHasContext
+  (^JavaSparkContext get-java-spark-context [this]
+    this))
+
+(defprotocol PConvertibleToScalaRDD
+  "Types convertible to RDD (scala abstract base for all RDD types)"
+  (^JavaRDD to-scala-rdd [this]))
+
+(extend-type RDD
+  PConvertibleToScalaRDD
+  (^JavaRDD to-scala-rdd [this]
+    this))
+
+(extend-type JavaRDDLike
+  PConvertibleToScalaRDD
+  (^JavaRDD to-scala-rdd [this]
+    (.rdd this)))
 
 (defprotocol PConvertibleToJavaRDD
   "Types convertible to JavaRDD"
