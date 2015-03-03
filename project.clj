@@ -43,8 +43,7 @@
                                                    [lein-marginalia "0.8.0"]
                                                    [lein-ancient "0.5.4"]
                                                    [codox "0.8.9"]
-                                                   [lein-release "1.0.5"]]
-                                  :resource-paths ["data"]}
+                                                   [lein-release "1.0.5"]]}
                        :provided {:dependencies
                                   [[org.apache.spark/spark-core_2.10 "1.2.0"]
                                    [org.apache.spark/spark-streaming_2.10 "1.2.0"]
@@ -53,7 +52,7 @@
                                    [org.apache.spark/spark-sql_2.10 "1.2.0"]
                                    [org.apache.spark/spark-mllib_2.10 "1.2.0"]]
                                    }
-                       :test     {:resource-paths ["dev-resources" "data"]
+                       :test     {:resource-paths ["dev-resources"]
                                   :aot            [
                                                    ;flambo.api-test
                                                    flambo.function-test
