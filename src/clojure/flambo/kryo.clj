@@ -63,7 +63,7 @@
         classname (str *ns* ".registrator." name)]
     `(do
        (gen-class :name ~classname
-                  :extends flambo.kryo.BaseFlamboRegistrator
+                  :extends flambo.serialize.BaseFlamboRegistrator
                   :prefix ~prefix)
        (defn ~(symbol (str prefix "register"))
          ~@register-impl)

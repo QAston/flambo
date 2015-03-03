@@ -24,7 +24,6 @@ public abstract class AbstractSerializableWrappedAFunctionAot implements Seriali
     }
 
     private void writeObject(ObjectOutputStream out) throws IOException {
-        f.__methodImplCache = null;
         writeAotFunction(out, f);
     }
 
