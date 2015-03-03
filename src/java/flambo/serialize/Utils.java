@@ -30,12 +30,7 @@ public class Utils {
     }
 
     public static void requireNamespace(String namespace) {
-
-        try {
-            require.invoke(symbol.invoke(namespace));
-        } catch (Exception e) {
-            System.out.println("WARN: Failed loading ns:" + namespace);
-        }
+        serializable.fn.Utils.tryRequire(namespace);
     }
 
     public static void writeAotFunction(ObjectOutputStream out, AFunction f) throws IOException {

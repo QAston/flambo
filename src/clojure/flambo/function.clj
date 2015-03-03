@@ -26,12 +26,12 @@
 (defn write-to-output-stream [^clojure.lang.AFunction$1 afn ^ObjectOutputStream out]
   (let [b (binding [sfn/*serialize* kryo/serialize]
             (serialize-fn afn))]
-    (.writeInt out (alength b))
-    (.write out ^bytes b)))
+    (log/trace "writing fn:" afn "serialized:" (String. b) "length:" (alength b))
+    (.writeObject out b)))
 
 (defn ^clojure.lang.AFunction$1 read-from-input-stream [^ObjectInputStream in]
-  (let [b (byte-array (.readInt in))
-        _ (.read in b)]
+  (let [b (.readObject in)]
+    (log/trace "reading fn serialized:" (String. b) "length:" (alength b))
     (binding [sfn/*deserialize* kryo/deserialize]
       (deserialize-fn b))))
 
