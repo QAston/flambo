@@ -8,7 +8,7 @@
                    (f/cache )
                    (f/rdd-name  name))]
     (try
-      (info name "/Partitioner: " (f/partitioner cached) ", #partitions:" (f/count-partitions cached))
+      (info name "/Partitioner: " (f/partitioner cached) ", #partitions:" (f/num-partitions cached))
       (catch Throwable t))
     (let [c (f/count cached)]
       (info "#items" name ": " c)

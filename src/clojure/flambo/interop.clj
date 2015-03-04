@@ -1,62 +1,116 @@
 (ns flambo.interop
-  (:refer-clojure :exclude [first second seq vec fn])
+  (:refer-clojure :exclude [first second seq vec fn nth])
   (:require [flambo.function :refer [fn]])
   (:import [scala Tuple1 Tuple2 Tuple3 Tuple4 Tuple5 Tuple6 Tuple7 Tuple8 Tuple9 Tuple10 Tuple11 Tuple12 Tuple13 Tuple14 Tuple15 Tuple16 Tuple17 Tuple18 Tuple19 Tuple20 Tuple21 Tuple22 Some]
-           [com.google.common.base Optional])
+           [com.google.common.base Optional]
+           (clojure.lang PersistentVector)
+           (java.util Collection))
   )
 
-(defprotocol ClojureTuple2
-  (first [this])
-  (second [this])
-  (vec [this])
-  (seq [this]))
+(defprotocol PVec
+  (^PersistentVector vec-impl [this])
+  (^Object nth-impl [this idx]))
+
+(defn vec
+  "Converts argument to clojure vector"
+  [this]
+  (vec-impl this))
+
+(defn nth
+  "returns nth element of a compatibile collection"
+  [this nth]
+  (nth-impl this nth))
+
+(defprotocol PSeq
+  (first-impl [this])
+  (second-impl [this])
+  (seq-impl [this]))
+
+(defn first
+  "Returns first element of a compatible collection"
+  [this]
+  (first-impl this))
+
+(defn second
+  "Returns second element of a compatible collection"
+  [this]
+  (second-impl this))
+
+(defn seq
+  "Returns seq of a compatible collection"
+  [this]
+  (seq-impl this))
 
 (extend-type Tuple2
-  ClojureTuple2
-  (first [this]
-    (._1 this))
-  (second [this]
-    (._2 this))
-  (vec [this]
+  PVec
+  (vec-impl [this]
     (let [v (transient [])]
-      (conj! v (first this))
-      (conj! v (second this))
+      (conj! v (._1 this))
+      (conj! v (._2 this))
       (persistent! v)))
-  (seq [this]
+  (nth-impl [this idx]
+    (case idx
+      0 (._1 this)
+      1 (._2 this)
+      (throw (ArrayIndexOutOfBoundsException. idx)))))
+
+(extend-type Collection
+  PVec
+  (vec-impl [this]
+    (clojure.core/vec this))
+  (nth-impl [this idx]
+    (clojure.core/nth this idx)))
+
+(extend-type Tuple2
+  PSeq
+  (first-impl [this]
+    (._1 this))
+  (second-impl [this]
+    (._2 this))
+  (seq-impl [this]
     (clojure.core/seq (vec this))))
+
+(extend-type Collection
+  PSeq
+  (first-impl [this]
+    (clojure.core/first this))
+  (second-impl [this]
+    (clojure.core/second this))
+  (seq-impl [this]
+    (clojure.core/seq this)))
 
 (defn key-val-fn
   "wraps a function f [k v] to untuple a key/value tuple. Useful e.g. on map for PairRDD."
   [f]
   (fn [^Tuple2 t]
-    (f (._1 t) (._2 t))))
+      (f (._1 t) (._2 t))))
 
 (defn key-seq-seq-fn
   "wraps a function f [k seq1 seq2] to untuple a key/value tuple with two partial values both being seqs. Useful e.g. on map after a cogroup with two RDDs."
   [f]
   (fn [^Tuple2 t]
-    (let [k (._1 t)
-          v ^Tuple2 (._2 t)]
-      (f k (seq (._1 v)) (seq (._2 v))))))
+      (let [k (._1 t)
+            v ^Tuple2 (._2 t)]
+        (f k (seq (._1 v)) (seq (._2 v))))))
 
 (defn seq-seq-fn
   "wraps a function f [seq1 seq2] to untuple a tuple-value with two partial values all being seqs. Useful e.g. on map-values after a cogroup with two RDDs."
   [f]
   (fn [^Tuple2 t]
-    (f (seq (._1 t)) (seq (._2 t)))))
+      (f (seq (._1 t)) (seq (._2 t)))))
 
 (defn key-seq-seq-seq-fn [f]
   "wraps a function f [k seq1 seq2 seq3] to untuple a key/value tuple with three partial values all being seqs. Useful e.g. on map after a cogroup with three RDDs."
   (fn [^Tuple2 t]
-    (let [k (._1 t)
-          v ^Tuple3 (._2 t)]
-      (f k (seq (._1 v)) (seq (._2 v)) (seq (._3 v))))))
+      (let [k (._1 t)
+            v ^Tuple3 (._2 t)]
+        (f k (seq (._1 v)) (seq (._2 v)) (seq (._3 v))))))
 
 (defn seq-seq-seq-fn
   "wraps a function f [seq1 seq2 seq3] to untuple a triple-value with three partial values all being seqs. Useful e.g. on map-values after a cogroup with three RDDs."
   [f]
   (fn [^Tuple3 v]
-    (f (seq (._1 v)) (seq (._2 v)) (seq (._3 v)))))
+      (f (seq (._1 v)) (seq (._2 v)) (seq (._3 v)))))
 
 (defn- second-value [^Tuple2 t]
   (._2 t))
@@ -71,11 +125,11 @@
                           optional-second-value
                           second-value)]
     (fn [^Tuple2 t]
-      (let [k (._1 t)
-            v ^Tuple2 (._2 t)
-            v1 (._1 v)
-            v2 (second-value-fn v)]
-        (f k v1 v2)))))
+        (let [k (._1 t)
+              v ^Tuple2 (._2 t)
+              v1 (._1 v)
+              v2 (second-value-fn v)]
+          (f k v1 v2)))))
 
 
 (defn val-val-fn
@@ -85,9 +139,9 @@
                           optional-second-value
                           second-value)]
     (fn [^Tuple2 v]
-      (let [v1 (._1 v)
-            v2 (second-value-fn v)]
-        (f v1 v2)))))
+        (let [v1 (._1 v)
+              v2 (second-value-fn v)]
+          (f v1 v2)))))
 
 (defn tuple
   "Returns a Scala tuple. Uses the Scala tuple class that matches the
@@ -99,51 +153,51 @@
   (apply $/tuple (range 23)) => (throws ExceptionInfo)"
   {:added "0.1.0"}
   ([a]
-    (Tuple1. a))
+   (Tuple1. a))
   ([a b]
-    (Tuple2. a b))
+   (Tuple2. a b))
   ([a b c]
-    (Tuple3. a b c))
+   (Tuple3. a b c))
   ([a b c d]
-    (Tuple4. a b c d))
+   (Tuple4. a b c d))
   ([a b c d e]
-    (Tuple5. a b c d e))
+   (Tuple5. a b c d e))
   ([a b c d e f]
-    (Tuple6. a b c d e f))
+   (Tuple6. a b c d e f))
   ([a b c d e f g]
-    (Tuple7. a b c d e f g))
+   (Tuple7. a b c d e f g))
   ([a b c d e f g h]
-    (Tuple8. a b c d e f g h))
+   (Tuple8. a b c d e f g h))
   ([a b c d e f g h i]
-    (Tuple9. a b c d e f g h i))
+   (Tuple9. a b c d e f g h i))
   ([a b c d e f g h i j]
-    (Tuple10. a b c d e f g h i j))
+   (Tuple10. a b c d e f g h i j))
   ([a b c d e f g h i j k]
-    (Tuple11. a b c d e f g h i j k))
+   (Tuple11. a b c d e f g h i j k))
   ([a b c d e f g h i j k l]
-    (Tuple12. a b c d e f g h i j k l))
+   (Tuple12. a b c d e f g h i j k l))
   ([a b c d e f g h i j k l m]
-    (Tuple13. a b c d e f g h i j k l m))
+   (Tuple13. a b c d e f g h i j k l m))
   ([a b c d e f g h i j k l m n]
-    (Tuple14. a b c d e f g h i j k l m n))
+   (Tuple14. a b c d e f g h i j k l m n))
   ([a b c d e f g h i j k l m n o]
-    (Tuple15. a b c d e f g h i j k l m n o))
+   (Tuple15. a b c d e f g h i j k l m n o))
   ([a b c d e f g h i j k l m n o p]
-    (Tuple16. a b c d e f g h i j k l m n o p))
+   (Tuple16. a b c d e f g h i j k l m n o p))
   ([a b c d e f g h i j k l m n o p q]
-    (Tuple17. a b c d e f g h i j k l m n o p q))
+   (Tuple17. a b c d e f g h i j k l m n o p q))
   ([a b c d e f g h i j k l m n o p q r]
-    (Tuple18. a b c d e f g h i j k l m n o p q r))
+   (Tuple18. a b c d e f g h i j k l m n o p q r))
   ([a b c d e f g h i j k l m n o p q r s]
-    (Tuple19. a b c d e f g h i j k l m n o p q r s))
+   (Tuple19. a b c d e f g h i j k l m n o p q r s))
   ([a b c d e f g h i j k l m n o p q r s t]
-    (Tuple20. a b c d e f g h i j k l m n o p q r s t))
+   (Tuple20. a b c d e f g h i j k l m n o p q r s t))
   ([a b c d e f g h i j k l m n o p q r s t & [u v :as args]]
-    (case (count args)
-      1 (Tuple21. a b c d e f g h i j k l m n o p q r s t u)
-      2 (Tuple22. a b c d e f g h i j k l m n o p q r s t u v)
-      (throw (ex-info "Can only create Scala tuples with up to 22 elements"
-                      {:count (+ 20 (count args))})))))
+   (case (count args)
+     1 (Tuple21. a b c d e f g h i j k l m n o p q r s t u)
+     2 (Tuple22. a b c d e f g h i j k l m n o p q r s t u v)
+     (throw (ex-info "Can only create Scala tuples with up to 22 elements"
+                     {:count (+ 20 (count args))})))))
 
 (defn to-tuple
   "Converts given coll to tuple."

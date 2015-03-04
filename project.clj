@@ -1,12 +1,10 @@
-(defproject com.tangramcare/flambo "0.5.2-SNAPSHOT"
+(defproject com.tangramcare/flambo "0.5.3-SNAPSHOT"
             :description "A Clojure DSL for Apache Spark"
             :url "http://git.itx.pl/o2/flambofork/"
             :license {:name "Eclipse Public License"
                       :url  "http://www.eclipse.org/legal/epl-v10.html"}
             :dependencies [[org.clojure/clojure "1.6.0"]
                            [org.clojure/tools.logging "0.2.6"]
-                           [clj-tuple "0.2.0"]
-                           [t6/from-scala "0.2.0"]
                            [com.tangramcare/serializable-fn "0.0.6-SNAPSHOT"
                             :exclusions [com.twitter/chill-java]]
                            [com.twitter/carbonite "1.4.0"
@@ -66,11 +64,6 @@
                        }
             :source-paths ["src/clojure"]
             :java-source-paths ["src/java"]
-            :codox {:defaults                  {:doc/format :markdown}
-                    :include                   [flambo.api flambo.conf flambo.kryo]
-                    :output-dir                "doc/codox"
-                    :src-dir-uri               "https://raw.githubusercontent.com/chrisbetz/flambo/develop/"
-                    :src-linenum-anchor-prefix "L"}
             :javac-options ["-source" "1.6" "-target" "1.6"]
             :jvm-opts ^:replace ["-server" "-Xmx1g"]
             :global-vars {*warn-on-reflection* false}

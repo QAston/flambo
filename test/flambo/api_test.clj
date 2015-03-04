@@ -23,6 +23,40 @@
         (-> (f/parallelize c [1 2 3 4 5]) f/collect vec) => (just [1 2 3 4 5]))
       )))
 
+(facts
+  "about interop - tuple"
+  (let [t (fi/tuple "a" "b")]
+    (fact "tuple works"
+          (class t) => scala.Tuple2)
+    (fact "first works"
+          (fi/first t) => "a")
+    (fact "second works"
+          (fi/second t) => "b")
+    (fact "seq works"
+          (fi/seq t) => (list "a" "b"))
+    (fact "vec works"
+          (fi/vec t) => (vector "a" "b"))
+    (fact "nth works"
+          (fi/nth t 0) => "a")
+    (fact "nth works"
+          (fi/nth t 1) => "b")))
+
+(facts
+  "about interop - vector"
+  (let [t (vector "a" "b")]
+    (fact "first works"
+          (fi/first t) => "a")
+    (fact "second works"
+          (fi/second t) => "b")
+    (fact "seq works"
+          (fi/seq t) => (list "a" "b"))
+    (fact "vec works"
+          (fi/vec t) => (vector "a" "b"))
+    (fact "nth works"
+          (fi/nth t 0) => "a")
+    (fact "nth works"
+          (fi/nth t 1) => "b")))
+
 #_(facts
   "about serializable functions"
 
@@ -117,6 +151,15 @@
             (f/map fi/untuple)
             f/collect
             vec) => [["a" 1] ["b" 1] ["c" 1] ["d" 1]])
+
+      (fact
+        "swap-key-value swaps keys and values"
+        (-> (f/parallelize-as-pairs c [["key1" 1]
+                                       ["key2" 2]])
+            (f/swap-key-value)
+            (f/map fi/untuple)
+            f/collect
+            vec) => (contains [[1 "key1"] [2 "key2"]]))
 
       (fact
         "reduce-by-key returns an RDD of (K, V) when called on an RDD of (K, V) pairs"

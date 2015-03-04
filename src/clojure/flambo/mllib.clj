@@ -1,5 +1,6 @@
 (ns flambo.mllib
-  (:require [flambo.api :as f])
+  (:require [flambo.api :as f]
+            [flambo.interop :as fi])
   (:import (org.apache.spark.mllib.linalg.distributed CoordinateMatrix RowMatrix))
   (:refer-clojure :exclude [vec])
   (:import (org.apache.spark.mllib.linalg Vector Vectors Matrices Matrix)
@@ -37,6 +38,22 @@
   (vec (dense-vec (range 0 100)))"
   [v]
   (clojure.core/vec (.toArray v)))
+
+(extend-type Vector
+  fi/PVec
+  (vec-impl [this]
+    (vec this))
+  (nth-impl [this idx]
+    (.apply this idx)))
+
+(extend-type Vector
+  fi/PSeq
+  (first-impl [this]
+    (.apply this 0))
+  (second-impl [this]
+    (.apply this 1))
+  (seq-impl [this]
+    (seq (fi/vec this))))
 
 (defn dense-matrix
   "Column-majored dense matrix filled with doubles from values-column-at-a-time one column at a time

@@ -610,29 +610,28 @@
     (JavaRDD/fromRDD (.rdd this) (.classTag this))
     ))
 
+(defn hash-partitioner
+  "Constructs a new hash partitionier"
+  ([n]
+   (HashPartitioner. n))
+  ([subkey-fn n]
+   (proxy [HashPartitioner] [n]
+     (getPartition [key]
+       (let [subkey (subkey-fn key)]
+         (mod (hash subkey) n))))))
+
 ;; JavaRDD common API
 
 (def cache
   "Persists `rdd` with the default storage level (`MEMORY_ONLY`)."
   (memfn cache))
 
-(defn count-partitions [rdd]
-  (alength (.partitions (.rdd rdd))))
+(declare num-partitions)
 
 (defn partitions
   "Returns a vector of partitions for a given JavaRDD"
   [rdd]
   (into [] (.partitions (.rdd rdd))))
-
-(defn hash-partitioner
-  "Constructs a new hash partitionier"
-  ([n]
-    (HashPartitioner. n))
-  ([subkey-fn n]
-    (proxy [HashPartitioner] [n]
-      (getPartition [key]
-        (let [subkey (subkey-fn key)]
-          (mod (hash subkey) n))))))
 
 (defn coalesce
   "Decrease the number of partitions in `rdd` to `n`.
@@ -646,9 +645,9 @@
   "Decrease the number of partitions in `rdd` to `n`.
   Useful for running operations more efficiently after filtering down a large dataset."
   ([rdd n]
-    (.coalesce rdd (min n (count-partitions rdd))))
+    (.coalesce rdd (min n (num-partitions rdd))))
   ([rdd n shuffle?]
-    (.coalesce rdd (min n (count-partitions rdd)) shuffle?)))
+    (.coalesce rdd (min n (num-partitions rdd)) shuffle?)))
 
 (defn distinct
   "Return a new RDD that contains the distinct elements of the source `rdd`."
@@ -706,7 +705,7 @@
     (.subtract rdd other-rdd partitions)))
 
 (defprotocol PUnionCapableRDD
-  "Types convertible to JavaRDD"
+  "RDD specific implementation of union"
   (union-impl [rdd rdds]))
 
 (extend-type JavaRDDLike
@@ -960,6 +959,12 @@
   [rdd key]
   (.lookup (to-java-pair-rdd rdd) key))
 
+(defn swap-key-value
+  "Returns value-key rdd from key-value rdd"
+  ^JavaPairRDD [^JavaPairRDD pair-rdd]
+  (map-to-pair pair-rdd (fn [^scala.Tuple2 t]
+                              [(._2 t) (._1 t)])))
+
 (defn partitioner [^JavaPairRDD rdd]
   (fi/some-or-nil (.partitioner (.rdd rdd))))
 
@@ -973,8 +978,3 @@
                           (iterator-seq iterator)))
     :preserves-partitioning true
     ))
-
-;; ColsRDD specific API
-
-;TODO: impl some ops for cols rdd
-;TODO: map-to-cols, flat-map-to-cols, use-cols-indexes, use-cols-idxfns
