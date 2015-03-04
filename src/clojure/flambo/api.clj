@@ -505,7 +505,7 @@
   "Zips this RDD with another one, returning PairRDD with the first element in each RDD, second element in each RDD, etc."
   (memfn zip))
 
-(def zip-with-ndex
+(def zip-with-index
   "Zips this RDD with its element indices, returning PairRDD"
   (memfn zipWithIndex))
 
