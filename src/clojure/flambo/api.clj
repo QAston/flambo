@@ -334,7 +334,7 @@
   (.cartesian rdd1 rdd2))
 
 (defn group-by
-  "Returns an RDD of items grouped by the return value of function `f`."
+  "Returns a PairRDD of items grouped by (JavaPairRDD<U, Iterable<T>>) the return value of function `f`."
   ([rdd f]
     (.groupBy rdd (function f)))
   ([rdd f n]

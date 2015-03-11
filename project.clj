@@ -1,4 +1,4 @@
-(defproject com.tangramcare/flambo "0.5.3-SNAPSHOT"
+(defproject com.tangramcare/flambo "0.5.4-SNAPSHOT"
             :description "A Clojure DSL for Apache Spark"
             :url "http://git.itx.pl/o2/flambofork/"
             :license {:name "Eclipse Public License"
@@ -43,12 +43,12 @@
                                                    [codox "0.8.9"]
                                                    [lein-release "1.0.5"]]}
                        :provided {:dependencies
-                                  [[org.apache.spark/spark-core_2.10 "1.2.0"]
-                                   [org.apache.spark/spark-streaming_2.10 "1.2.0"]
-                                   [org.apache.spark/spark-streaming-kafka_2.10 "1.2.0"]
-                                   [org.apache.spark/spark-streaming-flume_2.10 "1.2.0"]
-                                   [org.apache.spark/spark-sql_2.10 "1.2.0"]
-                                   [org.apache.spark/spark-mllib_2.10 "1.2.0"]]
+                                  [[org.apache.spark/spark-core_2.10 "1.2.1"]
+                                   [org.apache.spark/spark-streaming_2.10 "1.2.1"]
+                                   [org.apache.spark/spark-streaming-kafka_2.10 "1.2.1"]
+                                   [org.apache.spark/spark-streaming-flume_2.10 "1.2.1"]
+                                   [org.apache.spark/spark-sql_2.10 "1.2.1"]
+                                   [org.apache.spark/spark-mllib_2.10 "1.2.1"]]
                                    }
                        :test     {:resource-paths ["dev-resources"]
                                   :aot            [
