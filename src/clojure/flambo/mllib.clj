@@ -5,7 +5,9 @@
   (:refer-clojure :exclude [vec])
   (:import (org.apache.spark.mllib.linalg Vector Vectors Matrices Matrix)
            (org.apache.spark.mllib.linalg.distributed DistributedMatrix CoordinateMatrix RowMatrix IndexedRow IndexedRowMatrix MatrixEntry)
-           (org.apache.spark.mllib.regression LabeledPoint)))
+           (org.apache.spark.mllib.regression LabeledPoint)
+           (org.apache.spark.api.java JavaRDD)
+           (org.apache.spark.rdd RDD)))
 
 ;;linear algebra stuff
 
@@ -107,6 +109,36 @@
   ([entry-rdd]
     (CoordinateMatrix. (f/to-scala-rdd entry-rdd))
     ))
+
+(extend-type CoordinateMatrix
+  f/PConvertibleToScalaRDD
+  (^RDD to-scala-rdd [this]
+    (.entries this)))
+
+(extend-type IndexedRowMatrix
+  f/PConvertibleToScalaRDD
+  (^RDD to-scala-rdd [this]
+    (.rows this)))
+
+(extend-type RowMatrix
+  f/PConvertibleToScalaRDD
+  (^RDD to-scala-rdd [this]
+    (.rows this)))
+
+(extend-type CoordinateMatrix
+  f/PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    (f/to-java-rdd (.entries this))))
+
+(extend-type IndexedRowMatrix
+  f/PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    (f/to-java-rdd (.rows this))))
+
+(extend-type RowMatrix
+  f/PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    (f/to-java-rdd (.rows this))))
 
 (defn labeled-point
   "A labeled point is a local vector, either dense or sparse, associated with a label/response - Double"

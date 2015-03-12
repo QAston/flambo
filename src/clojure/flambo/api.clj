@@ -506,11 +506,11 @@
   (memfn zip))
 
 (def zip-with-index
-  "Zips this RDD with its element indices, returning PairRDD"
+  "Zips this RDD with its element indices [Entry, Index], returning PairRDD"
   (memfn zipWithIndex))
 
 (def zip-with-unique-id
-  "Zips this RDD with generated unique Long ids, returning PairRDD"
+  "Zips this RDD with generated unique Long ids [Entry, UniqueId], returning PairRDD"
   (memfn zipWithUniqueId))
 
 ;;
