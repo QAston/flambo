@@ -562,6 +562,11 @@
   (^JavaRDD to-java-rdd [this]
     (JavaRDD/fromRDD (.rdd this) (.classTag this))))
 
+(extend-type RDD
+  PConvertibleToJavaRDD
+  (^JavaRDD to-java-rdd [this]
+    (.toJavaRDD this)))
+
 (defprotocol PConvertibleToDoubleRDD
   "Types convertible to JavaDoubleRDD"
   (^JavaDoubleRDD to-java-double-rdd [this]))
@@ -982,7 +987,7 @@
 (defn save-rdd
   "Saves rdd into given path"
   [rdd path]
-  (.saveAsObjectFile (to-java-rdd rdd) (str path)))
+  (.saveAsObjectFile (to-scala-rdd rdd) (str path)))
 
 (defn load-rdd
   "Loads rdd from given path"
