@@ -978,3 +978,13 @@
                           (iterator-seq iterator)))
     :preserves-partitioning true
     ))
+
+(defn save-rdd
+  "Saves rdd into given path"
+  [rdd path]
+  (.saveAsObjectFile (to-java-rdd rdd) (str path)))
+
+(defn load-rdd
+  "Loads rdd from given path"
+  [sc path]
+  (.objectFile sc (str path)))
